@@ -59,17 +59,7 @@
             width: 12px;
             height: 12px;
             border-radius: 50%;
-            background: #ff4444;
-            animation: pulse 2s infinite;
-        }
-
-        .status-indicator.connected {
             background: #44ff44;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
         }
 
         .main-content {
@@ -237,22 +227,6 @@
             border-color: #667eea;
         }
 
-        .room-info button {
-            width: 100%;
-            padding: 10px;
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .room-info button:hover {
-            background: #5568d3;
-        }
-
         .peers-list {
             margin-top: 10px;
             font-size: 0.85em;
@@ -357,14 +331,13 @@
             display: none;
         }
 
-        .error-message {
-            background: #ffe6e6;
-            color: #cc0000;
-            padding: 10px;
-            border-radius: 8px;
-            margin-top: 10px;
+        .info-text {
             font-size: 0.9em;
-            display: none;
+            color: #666;
+            margin-top: 10px;
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 8px;
         }
     </style>
 </head>
@@ -373,15 +346,18 @@
     <div class="intro-overlay" id="introOverlay">
         <div class="intro-card">
             <h2>🎨 Collaborative Drawing</h2>
-            <p>Welcome! This is a real-time collaborative drawing app, just like Pictochat!</p>
+            <p>Welcome! Draw together in real-time, just like Pictochat!</p>
             <p><strong>How it works:</strong></p>
-            <p>• Enter a room name to create or join a drawing session<br>
-            • Share the room name with your friends<br>
-            • Draw together in real-time, no server needed!</p>
+            <p>• Everyone who enters the same room name will be connected<br>
+            • Draw together in real-time<br>
+            • Works peer-to-peer, no server needed!</p>
 
-            <input type="text" id="roomInput" placeholder="Enter room name (e.g., 'my-room')" />
+            <input type="text" id="roomInput" placeholder="Enter room name (e.g., 'art-party')" />
             <button id="joinButton">Start Drawing!</button>
-            <div class="error-message" id="errorMessage"></div>
+
+            <div class="info-text">
+                💡 Tip: Share this exact room name with friends so you can draw together!
+            </div>
         </div>
     </div>
 
@@ -390,7 +366,7 @@
             <h1>🎨 Collaborative Drawing</h1>
             <div class="connection-status">
                 <div class="status-indicator" id="statusIndicator"></div>
-                <span id="statusText">Connecting...</span>
+                <span id="statusText">Ready</span>
             </div>
         </div>
 
@@ -404,7 +380,7 @@
                     <h3>Room</h3>
                     <input type="text" id="roomName" readonly placeholder="Room name" />
                     <div class="peers-list" id="peersList">
-                        <span class="peer-indicator"></span> You
+                        <span class="peer-indicator"></span> You (drawing locally)
                     </div>
                 </div>
 
@@ -450,28 +426,30 @@
 
                 <div class="tool-section">
                     <h3>Tools</h3>
-                    <button class="tool-btn active" id="drawBtn" data-tool="draw">
+                    <button class="tool-btn active" id="drawBtn">
                         ✏️ Draw
                     </button>
-                    <button class="tool-btn" id="eraseBtn" data-tool="erase">
+                    <button class="tool-btn" id="eraseBtn">
                         🧹 Erase
                     </button>
                 </div>
 
                 <div class="tool-section">
                     <button class="tool-btn clear-btn" id="clearBtn">
-                        🗑️ Clear Canvas
+                        🗑️ Clear My Canvas
                     </button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Load Yjs libraries from CDN (UMD builds) -->
-    <script src="https://cdn.jsdelivr.net/npm/yjs@13.6.10/dist/yjs.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/y-webrtc@10.2.5/dist/y-webrtc.js"></script>
+    <!-- Using Yjs with simpler WebSocket provider -->
+    <script src="https://cdn.jsdelivr.net/npm/yjs@13/dist/yjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/y-websocket@1/dist/y-websocket.min.js"></script>
 
     <script>
+        console.log('🎨 Drawing app starting...');
+
         // Canvas setup
         const canvas = document.getElementById('drawingCanvas');
         const ctx = canvas.getContext('2d');
@@ -485,108 +463,91 @@
         let lastY = 0;
 
         // Yjs setup
-        let ydoc;
-        let provider;
-        let yarray;
-        let awareness;
+        let ydoc = null;
+        let provider = null;
+        let yarray = null;
 
-        // Initialize Yjs document
-        function initYjs(roomName) {
+        // Set default canvas background
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Initialize Yjs with WebSocket provider
+        function initCollaboration(roomName) {
             try {
-                console.log('Initializing Yjs with room:', roomName);
+                console.log('🔗 Connecting to room:', roomName);
 
                 ydoc = new Y.Doc();
 
-                // Use WebRTC provider for peer-to-peer connection
-                provider = new WebrtcProvider(roomName, ydoc, {
-                    signaling: [
-                        'wss://signaling.yjs.dev',
-                        'wss://y-webrtc-signaling-eu.herokuapp.com',
-                        'wss://y-webrtc-signaling-us.herokuapp.com'
-                    ]
-                });
+                // Using public Yjs WebSocket server
+                provider = new WebsocketProvider(
+                    'wss://demos.yjs.dev',
+                    'drawing-room-' + roomName,
+                    ydoc
+                );
 
-                // Get shared array for drawing data
-                yarray = ydoc.getArray('drawing');
+                yarray = ydoc.getArray('strokes');
 
-                // Get awareness for peer tracking
-                awareness = provider.awareness;
-
-                // Listen for drawing events from other users
+                // Listen for remote changes
                 yarray.observe(event => {
                     event.changes.added.forEach(item => {
-                        const content = item.content.getContent();
-                        if (content && content.length > 0) {
-                            const drawData = content[0];
-                            if (drawData && drawData.x1 !== undefined) {
-                                drawLine(drawData.x1, drawData.y1, drawData.x2, drawData.y2, drawData.color, drawData.size, drawData.tool);
+                        try {
+                            const content = item.content.getContent();
+                            if (content && content[0]) {
+                                const stroke = content[0];
+                                if (stroke.x1 !== undefined) {
+                                    drawLine(stroke.x1, stroke.y1, stroke.x2, stroke.y2,
+                                            stroke.color, stroke.size, stroke.tool);
+                                }
                             }
+                        } catch (e) {
+                            console.error('Error drawing remote stroke:', e);
                         }
                     });
                 });
 
-                // Update connection status
+                // Connection status
                 provider.on('status', event => {
-                    console.log('Provider status:', event);
-                    const statusIndicator = document.getElementById('statusIndicator');
+                    console.log('📡 Connection status:', event.status);
                     const statusText = document.getElementById('statusText');
+                    const peersList = document.getElementById('peersList');
 
-                    if (event.connected) {
-                        statusIndicator.classList.add('connected');
+                    if (event.status === 'connected') {
                         statusText.textContent = 'Connected';
+                        peersList.innerHTML = '<span class="peer-indicator"></span> Drawing together!';
                     } else {
-                        statusIndicator.classList.remove('connected');
                         statusText.textContent = 'Connecting...';
                     }
                 });
 
-                // Update peer count
-                awareness.on('change', () => {
-                    const peers = awareness.getStates().size;
-                    const peersList = document.getElementById('peersList');
-                    peersList.innerHTML = `<span class="peer-indicator"></span> You`;
-                    if (peers > 1) {
-                        peersList.innerHTML += ` + ${peers - 1} other${peers > 2 ? 's' : ''}`;
-                    }
+                // Sync status
+                provider.on('sync', synced => {
+                    console.log('🔄 Synced:', synced);
                 });
 
-                // Set room name display
-                document.getElementById('roomName').value = roomName;
-
-                console.log('Yjs initialized successfully');
+                console.log('✅ Collaboration initialized');
             } catch (error) {
-                console.error('Error initializing Yjs:', error);
-                showError('Failed to initialize: ' + error.message);
+                console.error('❌ Error initializing collaboration:', error);
+                document.getElementById('statusText').textContent = 'Error - drawing locally only';
             }
         }
 
-        // Show error message
-        function showError(message) {
-            const errorDiv = document.getElementById('errorMessage');
-            errorDiv.textContent = message;
-            errorDiv.style.display = 'block';
-        }
-
-        // Join room function
+        // Join room
         document.getElementById('joinButton').addEventListener('click', function() {
-            const roomInput = document.getElementById('roomInput');
-            const roomName = roomInput.value.trim();
-
-            console.log('Join button clicked, room name:', roomName);
+            const roomName = document.getElementById('roomInput').value.trim();
 
             if (!roomName) {
-                showError('Please enter a room name');
+                alert('Please enter a room name!');
                 return;
             }
 
-            // Hide intro overlay
+            console.log('👋 Joining room:', roomName);
             document.getElementById('introOverlay').classList.add('hidden');
+            document.getElementById('roomName').value = roomName;
 
-            // Initialize Yjs with room name
-            initYjs(roomName);
+            initCollaboration(roomName);
         });
 
-        // Also allow Enter key to join
+        // Enter key to join
         document.getElementById('roomInput').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 document.getElementById('joinButton').click();
@@ -611,7 +572,6 @@
             const scaleY = canvas.height / rect.height;
 
             let clientX, clientY;
-
             if (e.touches && e.touches.length > 0) {
                 clientX = e.touches[0].clientX;
                 clientY = e.touches[0].clientY;
@@ -645,17 +605,22 @@
             // Draw locally
             drawLine(lastX, lastY, x, y, currentColor, currentSize, currentTool);
 
-            // Broadcast to other users
+            // Share with others
             if (yarray) {
-                yarray.push([{
-                    x1: lastX,
-                    y1: lastY,
-                    x2: x,
-                    y2: y,
-                    color: currentColor,
-                    size: currentSize,
-                    tool: currentTool
-                }]);
+                try {
+                    yarray.push([{
+                        x1: lastX,
+                        y1: lastY,
+                        x2: x,
+                        y2: y,
+                        color: currentColor,
+                        size: currentSize,
+                        tool: currentTool,
+                        timestamp: Date.now()
+                    }]);
+                } catch (e) {
+                    console.error('Error sharing stroke:', e);
+                }
             }
 
             lastX = x;
@@ -667,13 +632,13 @@
             isDrawing = false;
         }
 
-        // Event listeners for mouse
+        // Mouse events
         canvas.addEventListener('mousedown', startDrawing);
         canvas.addEventListener('mousemove', draw);
         canvas.addEventListener('mouseup', stopDrawing);
         canvas.addEventListener('mouseout', stopDrawing);
 
-        // Event listeners for touch
+        // Touch events
         canvas.addEventListener('touchstart', startDrawing);
         canvas.addEventListener('touchmove', draw);
         canvas.addEventListener('touchend', stopDrawing);
@@ -688,7 +653,7 @@
             }
         });
 
-        // Brush size selection
+        // Brush size
         document.getElementById('brushSizes').addEventListener('click', function(e) {
             const sizeBtn = e.target.closest('.size-btn');
             if (sizeBtn) {
@@ -698,7 +663,7 @@
             }
         });
 
-        // Tool selection
+        // Tools
         document.getElementById('drawBtn').addEventListener('click', function() {
             currentTool = 'draw';
             document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
@@ -713,22 +678,11 @@
 
         // Clear canvas
         document.getElementById('clearBtn').addEventListener('click', function() {
-            if (confirm('Clear the entire canvas? This will affect all users.')) {
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-                // Clear the shared array
-                if (yarray) {
-                    yarray.delete(0, yarray.length);
-                }
-            }
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
         });
 
-        // Set default canvas background
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        console.log('Drawing app initialized');
+        console.log('✅ Drawing app ready!');
     </script>
 </body>
 </html>
