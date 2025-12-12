@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>App Idea Generator - Create Your Next Project</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .step {
+            display: none;
+            animation: fadeIn 0.5s;
+        }
+
+        .step.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .step h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+        }
+
+        .step p {
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .option {
+            padding: 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+
+        .option:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+            transform: translateY(-2px);
+        }
+
+        .option.selected {
+            border-color: #667eea;
+            background: #667eea;
+            color: white;
+        }
+
+        .option .icon {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .option .label {
+            font-weight: 600;
+        }
+
+        .option .description {
+            font-size: 0.9em;
+            opacity: 0.8;
+            margin-top: 5px;
+        }
+
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1em;
+            margin-bottom: 20px;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .checkbox-group {
+            margin-bottom: 20px;
+        }
+
+        .checkbox-item {
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+        }
+
+        .checkbox-item:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .checkbox-item.selected {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            margin-right: 10px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .inspiration-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .inspiration-card {
+            padding: 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            background: #f8f9ff;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .inspiration-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .inspiration-card h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .inspiration-card p {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: space-between;
+            margin-top: 30px;
+        }
+
+        button {
+            padding: 15px 30px;
+            font-size: 1em;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            font-family: inherit;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+            flex: 1;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #d0d0d0;
+        }
+
+        .progress-bar {
+            height: 5px;
+            background: #e0e0e0;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-bottom: 30px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.5s;
+        }
+
+        .result-container {
+            background: #f8f9ff;
+            border: 2px solid #667eea;
+            border-radius: 10px;
+            padding: 30px;
+            margin-top: 20px;
+        }
+
+        .result-container h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+
+        .prompt-output {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            white-space: pre-wrap;
+            max-height: 500px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+        }
+
+        .copy-btn {
+            background: #28a745;
+            color: white;
+            width: 100%;
+        }
+
+        .copy-btn:hover {
+            background: #218838;
+        }
+
+        .copy-btn.copied {
+            background: #5cb85c;
+        }
+
+        .niche-suggestions {
+            background: #fff9e6;
+            border: 2px solid #ffc107;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .niche-suggestions h4 {
+            color: #ff9800;
+            margin-bottom: 10px;
+        }
+
+        .niche-item {
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 5px 10px;
+            background: #e0e0e0;
+            border-radius: 5px;
+            margin-right: 5px;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+        }
+
+        .summary-section {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .summary-section h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .summary-item {
+            margin-bottom: 10px;
+            padding-left: 20px;
+        }
+
+        .summary-item strong {
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 App Idea Generator</h1>
+            <p>Transform your thoughts into actionable project ideas with AI-ready prompts</p>
+        </div>
+
+        <div class="content">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressBar" style="width: 0%"></div>
+            </div>
+
+            <!-- Step 1: Welcome -->
+            <div class="step active" id="step1">
+                <h2>Welcome! Let's Find Your Next Great Idea</h2>
+                <p>I'll guide you through a series of questions to help discover the perfect app or game idea. At the end, you'll get a complete, ready-to-use prompt for Claude Code.</p>
+
+                <div class="inspiration-grid">
+                    <div class="inspiration-card">
+                        <h3>🎮 For Fun</h3>
+                        <p>Games, creative tools, entertainment apps</p>
+                    </div>
+                    <div class="inspiration-card">
+                        <h3>🌍 Make Impact</h3>
+                        <p>Solve real problems, help communities</p>
+                    </div>
+                    <div class="inspiration-card">
+                        <h3>📚 Learn & Grow</h3>
+                        <p>Educational tools, skill builders</p>
+                    </div>
+                    <div class="inspiration-card">
+                        <h3>⚡ Productivity</h3>
+                        <p>Tools to work smarter, not harder</p>
+                    </div>
+                </div>
+
+                <div class="buttons">
+                    <button class="btn-primary" onclick="nextStep()">Let's Start! →</button>
+                </div>
+            </div>
+
+            <!-- Step 2: Project Type -->
+            <div class="step" id="step2">
+                <h2>What type of project interests you?</h2>
+                <p>Choose one or more categories that excite you</p>
+
+                <div class="checkbox-group" id="projectTypes">
+                    <div class="checkbox-item" onclick="toggleCheckbox(this, 'type')">
+                        <input type="checkbox" value="game">
+                        <div>
+                            <div class="label">🎮 Game / Interactive Experience</div>
+                            <div class="description">Fun, engaging, playful projects</div>
+                        </div>
+                    </div>
+                    <div class="checkbox-item" onclick="toggleCheckbox(this, 'type')">
+                        <input type="checkbox" value="productivity">
+                        <div>
+                            <div class="label">⚡ Productivity Tool</div>
+                            <div class="description">Help people work more efficiently</div>
+                        </div>
+                    </div>
+                    <div class="checkbox-item" onclick="toggleCheckbox(this, 'type')">
+                        <input type="checkbox" value="education">
+                        <div>
+                            <div class="label">📚 Educational Tool</div>
+                            <div class="description">Teaching, learning, skill development</div>
+                        </div>
+                    </div>
+                    <div class="checkbox-item" onclick="toggleCheckbox(this, 'type')">
+                        <input type="checkbox" value="health">
+                        <div>
+                            <div class="label">💪 Health & Wellness</div>
+                            <div class="description">Physical or mental wellbeing</div>
+                        </div>
+                    </div>
+                    <div class="checkbox-item" onclick="toggleCheckbox(this, 'type')">
+                        <input type="checkbox" value="social">
+                        <div>
+                            <div class="label">👥 Social / Community</div>
+                            <div class="description">Connect people, build communities</div>
+                        </div>
+                    </div>
+                    <div class="checkbox-item" onclick="toggleCheckbox(this, 'type')">
+                        <input type="checkbox" value="creative">
+                        <div>
+                            <div class="label">🎨 Creative Tool</div>
+                            <div class="description">Art, music, writing, design</div>
+                        </div>
+                    </div>
+                    <div class="checkbox-item" onclick="toggleCheckbox(this, 'type')">
+                        <input type="checkbox" value="utility">
+                        <div>
+                            <div class="label">🛠️ Utility / Helper</div>
+                            <div class="description">Solve a specific everyday problem</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="buttons">
+                    <button class="btn-secondary" onclick="prevStep()">← Back</button>
+                    <button class="btn-primary" onclick="nextStep()">Continue →</button>
+                </div>
+            </div>
+
+            <!-- Step 3: Complexity -->
+            <div class="step" id="step3">
+                <h2>How complex should this project be?</h2>
+                <p>Choose a scope that matches your time and goals</p>
+
+                <div class="options" id="complexity">
+                    <div class="option" onclick="selectOption(this, 'complexity')">
+                        <div class="icon">⚡</div>
+                        <div class="label">Quick & Simple</div>
+                        <div class="description">Weekend project, single feature</div>
+                    </div>
+                    <div class="option" onclick="selectOption(this, 'complexity')">
+                        <div class="icon">🎯</div>
+                        <div class="label">Moderate</div>
+                        <div class="description">1-2 weeks, few key features</div>
+                    </div>
+                    <div class="option" onclick="selectOption(this, 'complexity')">
+                        <div class="icon">🏗️</div>
+                        <div class="label">Full Featured</div>
+                        <div class="description">Rich functionality, polished UX</div>
+                    </div>
+                </div>
+
+                <div class="buttons">
+                    <button class="btn-secondary" onclick="prevStep()">← Back</button>
+                    <button class="btn-primary" onclick="nextStep()">Continue →</button>
+                </div>
+            </div>
+
+            <!-- Step 4: Skills & Interests -->
+            <div class="step" id="step4">
+                <h2>What are your skills and interests?</h2>
+                <p>This helps us suggest ideas that match your strengths</p>
+
+                <label><strong>Technical skills (select all that apply):</strong></label>
+                <div class="checkbox-group" id="skills">
+                    <div class="checkbox-item" onclick="toggleCheckbox(this, 'skill')">
+                        <input type="checkbox" value="javascript">
+                        <div class="label">JavaScript / TypeScript</div>
+                    </div>
+                    <div class="checkbox-item" onclick="toggleCheckbox(this, 'skill')">
+                        <input type="checkbox" value="python">
+                        <div class="label">Python</div>
+                    </div>
+                    <div class="checkbox-item" onclick="toggleCheckbox(this, 'skill')">
+                        <input type="checkbox" value="design">
+                        <div class="label">UI/UX Design</div>
+                    </div>
+                    <div class="checkbox-item" onclick="toggleCheckbox(this, 'skill')">
+                        <input type="checkbox" value="data">
+                        <div class="label">Data / Algorithms</div>
+                    </div>
+                    <div class="checkbox-item" onclick="toggleCheckbox(this, 'skill')">
+                        <input type="checkbox" value="beginner">
+                        <div class="label">Beginner (learning as I go)</div>
+                    </div>
+                </div>
+
+                <label><strong>Personal interests or hobbies:</strong></label>
+                <input type="text" id="interests" placeholder="e.g., cooking, fitness, music, reading, travel...">
+
+                <div class="buttons">
+                    <button class="btn-secondary" onclick="prevStep()">← Back</button>
+                    <button class="btn-primary" onclick="nextStep()">Continue →</button>
+                </div>
+            </div>
+
+            <!-- Step 5: Problems & Pain Points -->
+            <div class="step" id="step5">
+                <h2>What problems have you noticed?</h2>
+                <p>Great ideas often come from personal frustrations or unmet needs</p>
+
+                <label><strong>Describe any problems, annoyances, or gaps you've experienced:</strong></label>
+                <textarea id="problems" placeholder="Examples:&#10;- I wish there was an easier way to...&#10;- I get frustrated when...&#10;- I can never find a tool that...&#10;- It would be great if..."></textarea>
+
+                <label><strong>Who else might have this problem?</strong></label>
+                <input type="text" id="audience" placeholder="e.g., students, parents, developers, small business owners...">
+
+                <div class="buttons">
+                    <button class="btn-secondary" onclick="prevStep()">← Back</button>
+                    <button class="btn-primary" onclick="nextStep()">Continue →</button>
+                </div>
+            </div>
+
+            <!-- Step 6: Inspiration Browse -->
+            <div class="step" id="step6">
+                <h2>Browse some inspiration</h2>
+                <p>Click on any ideas that spark your interest</p>
+
+                <div id="inspirationContainer"></div>
+
+                <div class="buttons">
+                    <button class="btn-secondary" onclick="prevStep()">← Back</button>
+                    <button class="btn-primary" onclick="nextStep()">Continue →</button>
+                </div>
+            </div>
+
+            <!-- Step 7: Generate Ideas -->
+            <div class="step" id="step7">
+                <h2>Your Personalized Ideas</h2>
+                <p>Based on your responses, here are some tailored suggestions</p>
+
+                <div id="generatedIdeas"></div>
+
+                <div class="buttons">
+                    <button class="btn-secondary" onclick="prevStep()">← Back</button>
+                    <button class="btn-primary" onclick="nextStep()">Refine Selected Idea →</button>
+                </div>
+            </div>
+
+            <!-- Step 8: Refine & Details -->
+            <div class="step" id="step8">
+                <h2>Let's refine your idea</h2>
+                <p>Add more details to create the perfect implementation prompt</p>
+
+                <div id="selectedIdeaSummary"></div>
+
+                <label><strong>Core features (what must it do?):</strong></label>
+                <textarea id="coreFeatures" placeholder="List the essential features..."></textarea>
+
+                <label><strong>Nice-to-have features (optional enhancements):</strong></label>
+                <textarea id="niceFeatures" placeholder="Additional features if time permits..."></textarea>
+
+                <label><strong>Technology preferences:</strong></label>
+                <div class="checkbox-group" id="techStack">
+                    <div class="checkbox-item" onclick="toggleCheckbox(this, 'tech')">
+                        <input type="checkbox" value="vanilla" checked>
+                        <div class="label">Vanilla HTML/CSS/JS (no frameworks)</div>
+                    </div>
+                    <div class="checkbox-item" onclick="toggleCheckbox(this, 'tech')">
+                        <input type="checkbox" value="react">
+                        <div class="label">React</div>
+                    </div>
+                    <div class="checkbox-item" onclick="toggleCheckbox(this, 'tech')">
+                        <input type="checkbox" value="python">
+                        <div class="label">Python</div>
+                    </div>
+                    <div class="checkbox-item" onclick="toggleCheckbox(this, 'tech')">
+                        <input type="checkbox" value="nodejs">
+                        <div class="label">Node.js</div>
+                    </div>
+                </div>
+
+                <label><strong>Any specific requirements or constraints?</strong></label>
+                <textarea id="requirements" placeholder="e.g., must work offline, mobile-friendly, accessibility features..."></textarea>
+
+                <div class="buttons">
+                    <button class="btn-secondary" onclick="prevStep()">← Back</button>
+                    <button class="btn-primary" onclick="generatePrompt()">Generate Claude Code Prompt 🎉</button>
+                </div>
+            </div>
+
+            <!-- Step 9: Final Prompt -->
+            <div class="step" id="step9">
+                <h2>🎉 Your Claude Code Prompt is Ready!</h2>
+                <p>Copy this prompt and paste it into a new Claude Code session to start building</p>
+
+                <div class="result-container">
+                    <h3>📋 Implementation Prompt</h3>
+                    <div class="prompt-output" id="finalPrompt"></div>
+                    <button class="copy-btn" onclick="copyPrompt()">📋 Copy to Clipboard</button>
+                </div>
+
+                <div class="buttons">
+                    <button class="btn-secondary" onclick="resetGenerator()">← Start Over</button>
+                    <button class="btn-primary" onclick="window.print()">🖨️ Save/Print</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State management
+        let currentStep = 1;
+        const totalSteps = 9;
+        const answers = {
+            projectTypes: [],
+            complexity: '',
+            skills: [],
+            interests: '',
+            problems: '',
+            audience: '',
+            selectedInspiration: [],
+            selectedIdea: null,
+            coreFeatures: '',
+            niceFeatures: '',
+            techStack: ['vanilla'],
+            requirements: ''
+        };
+
+        // Inspiration database
+        const inspirations = {
+            game: [
+                { title: "Word Puzzle Daily", desc: "Daily word challenges with streak tracking", niche: "Combines learning with gaming" },
+                { title: "Rhythm Memory", desc: "Music-based memory game", niche: "Audio + cognitive training" },
+                { title: "Micro RPG", desc: "Text-based adventure in your browser", niche: "Nostalgic, quick gameplay" },
+                { title: "Drawing Charades", desc: "Real-time drawing guessing game", niche: "Social, creative, async-friendly" }
+            ],
+            productivity: [
+                { title: "Focus Flow", desc: "Pomodoro timer with ambient sounds", niche: "Combines focus with soundscapes" },
+                { title: "Quick Capture", desc: "Lightning-fast note capture with tags", niche: "Faster than opening note apps" },
+                { title: "Meeting Digest", desc: "Summarize and track action items", niche: "Extract value from meetings" },
+                { title: "Habit Stack", desc: "Chain small habits together visually", niche: "Visual habit linking" }
+            ],
+            education: [
+                { title: "Explain Like I'm 5", desc: "Simplify complex topics instantly", niche: "Learning through simplification" },
+                { title: "Practice Flashcards", desc: "Spaced repetition with custom decks", niche: "Personalized learning paths" },
+                { title: "Code Snippet Quiz", desc: "Test coding knowledge with snippets", niche: "Learn by doing micro-challenges" },
+                { title: "Language Immersion", desc: "Learn languages through context", niche: "Real-world language practice" }
+            ],
+            health: [
+                { title: "Posture Reminder", desc: "Gentle alerts to check your posture", niche: "Desk worker health" },
+                { title: "Mood Tracker", desc: "Visual mood patterns over time", niche: "Mental health awareness" },
+                { title: "Water Reminder", desc: "Gamified hydration tracking", niche: "Simple health habit" },
+                { title: "Stretch Breaks", desc: "Guided mini-exercises at your desk", niche: "Movement for sedentary workers" }
+            ],
+            social: [
+                { title: "Compliment Generator", desc: "Spread positivity with kind words", niche: "Mental health support" },
+                { title: "Book Club Hub", desc: "Organize and discuss books together", niche: "Async reading discussions" },
+                { title: "Random Coffee", desc: "Match people for virtual coffee chats", niche: "Remote team building" },
+                { title: "Gratitude Wall", desc: "Shared appreciation board", niche: "Positive community building" }
+            ],
+            creative: [
+                { title: "Pixel Art Studio", desc: "Simple browser-based pixel editor", niche: "Accessible art creation" },
+                { title: "Story Starter", desc: "Writing prompts and story building", niche: "Combat writer's block" },
+                { title: "Color Palette Finder", desc: "Generate beautiful color schemes", niche: "Design inspiration" },
+                { title: "Melody Maker", desc: "Create simple tunes in browser", niche: "Music creation for non-musicians" }
+            ],
+            utility: [
+                { title: "File Name Cleaner", desc: "Batch rename files intelligently", niche: "Developer/designer workflow" },
+                { title: "Time Zone Buddy", desc: "Easy scheduling across time zones", niche: "Remote team coordination" },
+                { title: "Regex Tester", desc: "Visual regex pattern tester", niche: "Developer tool with UX" },
+                { title: "JSON Formatter", desc: "Pretty-print and validate JSON", niche: "Developer productivity" }
+            ]
+        };
+
+        // Niche ideas based on combinations
+        const nicheIdeas = {
+            "game-education": [
+                "Coding Quest - Learn programming through RPG mechanics",
+                "Math Dungeon - Solve equations to defeat monsters",
+                "History Timeline Game - Place events correctly to build civilization"
+            ],
+            "productivity-health": [
+                "Work-Life Balance Tracker - Visualize time distribution with health insights",
+                "Ergonomic Work Timer - Optimal work/rest cycles based on science",
+                "Stress-Free Task Manager - Prevent overwhelm with load balancing"
+            ],
+            "creative-social": [
+                "Collaborative Art Canvas - Real-time group drawing/painting",
+                "Story Chain - Each person adds a sentence to ongoing stories",
+                "Music Mix Collaborator - Create playlists together with voting"
+            ],
+            "game-health": [
+                "Fitness RPG - Real exercises level up your character",
+                "Meditation Adventure - Guided meditation as a journey",
+                "Sleep Quest - Track and improve sleep quality through game"
+            ]
+        };
+
+        // Navigation functions
+        function nextStep() {
+            if (currentStep < totalSteps) {
+                // Validate current step before proceeding
+                if (!validateStep(currentStep)) {
+                    return;
+                }
+
+                // Save current step data
+                saveStepData(currentStep);
+
+                // Special handling for idea generation step
+                if (currentStep === 6) {
+                    generateIdeasFromAnswers();
+                }
+
+                document.getElementById(`step${currentStep}`).classList.remove('active');
+                currentStep++;
+                document.getElementById(`step${currentStep}`).classList.add('active');
+                updateProgress();
+                window.scrollTo(0, 0);
+            }
+        }
+
+        function prevStep() {
+            if (currentStep > 1) {
+                document.getElementById(`step${currentStep}`).classList.remove('active');
+                currentStep--;
+                document.getElementById(`step${currentStep}`).classList.add('active');
+                updateProgress();
+                window.scrollTo(0, 0);
+            }
+        }
+
+        function updateProgress() {
+            const progress = ((currentStep - 1) / (totalSteps - 1)) * 100;
+            document.getElementById('progressBar').style.width = progress + '%';
+        }
+
+        function validateStep(step) {
+            switch(step) {
+                case 2:
+                    if (answers.projectTypes.length === 0) {
+                        alert('Please select at least one project type');
+                        return false;
+                    }
+                    break;
+                case 3:
+                    if (!answers.complexity) {
+                        alert('Please select a complexity level');
+                        return false;
+                    }
+                    break;
+            }
+            return true;
+        }
+
+        function saveStepData(step) {
+            switch(step) {
+                case 4:
+                    answers.interests = document.getElementById('interests').value;
+                    break;
+                case 5:
+                    answers.problems = document.getElementById('problems').value;
+                    answers.audience = document.getElementById('audience').value;
+                    break;
+                case 8:
+                    answers.coreFeatures = document.getElementById('coreFeatures').value;
+                    answers.niceFeatures = document.getElementById('niceFeatures').value;
+                    answers.requirements = document.getElementById('requirements').value;
+                    break;
+            }
+        }
+
+        // Selection functions
+        function selectOption(element, category) {
+            const container = element.parentElement;
+            container.querySelectorAll('.option').forEach(opt => opt.classList.remove('selected'));
+            element.classList.add('selected');
+            answers[category] = element.querySelector('.label').textContent;
+        }
+
+        function toggleCheckbox(element, category) {
+            const checkbox = element.querySelector('input[type="checkbox"]');
+            checkbox.checked = !checkbox.checked;
+            element.classList.toggle('selected');
+
+            const value = checkbox.value;
+            const arrayName = category === 'type' ? 'projectTypes' :
+                             category === 'skill' ? 'skills' :
+                             category === 'tech' ? 'techStack' : null;
+
+            if (arrayName) {
+                if (checkbox.checked) {
+                    if (!answers[arrayName].includes(value)) {
+                        answers[arrayName].push(value);
+                    }
+                } else {
+                    answers[arrayName] = answers[arrayName].filter(v => v !== value);
+                }
+            }
+        }
+
+        // Generate inspiration cards
+        function generateInspirationCards() {
+            const container = document.getElementById('inspirationContainer');
+            const relevantTypes = answers.projectTypes.length > 0 ? answers.projectTypes : Object.keys(inspirations);
+
+            let html = '';
+            relevantTypes.forEach(type => {
+                if (inspirations[type]) {
+                    html += `<h3 style="margin: 20px 0 10px; color: #667eea;">
+                        ${type.charAt(0).toUpperCase() + type.slice(1)} Ideas
+                    </h3>`;
+                    html += '<div class="inspiration-grid">';
+                    inspirations[type].forEach((idea, index) => {
+                        html += `
+                            <div class="inspiration-card" onclick="toggleInspiration('${type}-${index}', this)">
+                                <h3>${idea.title}</h3>
+                                <p>${idea.desc}</p>
+                                <div class="tag">${idea.niche}</div>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                }
+            });
+
+            container.innerHTML = html;
+        }
+
+        function toggleInspiration(id, element) {
+            element.style.border = element.style.borderColor === 'rgb(102, 126, 234)' ?
+                '2px solid #e0e0e0' : '2px solid #667eea';
+
+            const index = answers.selectedInspiration.indexOf(id);
+            if (index > -1) {
+                answers.selectedInspiration.splice(index, 1);
+            } else {
+                answers.selectedInspiration.push(id);
+            }
+        }
+
+        // Generate personalized ideas
+        function generateIdeasFromAnswers() {
+            const container = document.getElementById('generatedIdeas');
+            const ideas = [];
+
+            // Generate ideas based on combinations
+            const types = answers.projectTypes;
+            if (types.length >= 2) {
+                const combo = `${types[0]}-${types[1]}`;
+                if (nicheIdeas[combo]) {
+                    ideas.push(...nicheIdeas[combo].map(idea => ({
+                        title: idea,
+                        source: 'Unique Niche Combination',
+                        reasoning: `Combines ${types[0]} with ${types[1]} - underserved market`
+                    })));
+                }
+            }
+
+            // Generate ideas based on problems
+            if (answers.problems) {
+                ideas.push({
+                    title: `Problem Solver: ${answers.problems.split('\n')[0].substring(0, 50)}...`,
+                    source: 'Your Pain Point',
+                    reasoning: 'Solving a real problem you experience personally'
+                });
+            }
+
+            // Generate ideas based on interests
+            if (answers.interests) {
+                const interests = answers.interests.split(',').map(i => i.trim());
+                interests.forEach(interest => {
+                    types.forEach(type => {
+                        ideas.push({
+                            title: `${interest.charAt(0).toUpperCase() + interest.slice(1)} ${type.charAt(0).toUpperCase() + type.slice(1)}`,
+                            source: 'Interest + Project Type',
+                            reasoning: `Combines your passion for ${interest} with ${type}`
+                        });
+                    });
+                });
+            }
+
+            // Add some wild card creative ideas
+            ideas.push({
+                title: "Random Act of Kindness Tracker",
+                source: 'Make the World Better',
+                reasoning: 'Simple way to encourage and track daily good deeds'
+            });
+
+            ideas.push({
+                title: "Micro Skills Learning Hub",
+                source: 'Educational Innovation',
+                reasoning: 'Learn tiny skills in 5 minutes - perfect for busy people'
+            });
+
+            // Display ideas
+            let html = '<div class="niche-suggestions"><h4>💡 Underserved Niches Based on Your Interests</h4>';
+
+            ideas.forEach((idea, index) => {
+                html += `
+                    <div class="niche-item" style="cursor: pointer; transition: all 0.3s;"
+                         onclick="selectIdea(${index}, this)">
+                        <strong>${idea.title}</strong><br>
+                        <small style="color: #666;">
+                            <span class="tag">${idea.source}</span>
+                            ${idea.reasoning}
+                        </small>
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+            container.innerHTML = html;
+
+            // Store ideas for later
+            window.generatedIdeas = ideas;
+        }
+
+        function selectIdea(index, element) {
+            // Remove previous selection
+            document.querySelectorAll('.niche-item').forEach(item => {
+                item.style.background = 'white';
+                item.style.border = 'none';
+            });
+
+            // Highlight selected
+            element.style.background = '#f8f9ff';
+            element.style.border = '2px solid #667eea';
+
+            answers.selectedIdea = window.generatedIdeas[index];
+
+            // Update summary for next step
+            document.getElementById('selectedIdeaSummary').innerHTML = `
+                <div class="summary-section">
+                    <h4>Selected Idea: ${answers.selectedIdea.title}</h4>
+                    <p style="color: #666;">${answers.selectedIdea.reasoning}</p>
+                </div>
+            `;
+        }
+
+        // Generate final Claude Code prompt
+        function generatePrompt() {
+            saveStepData(8);
+
+            const idea = answers.selectedIdea || { title: 'Custom App Idea', reasoning: '' };
+            const types = answers.projectTypes.join(', ');
+            const skills = answers.skills.join(', ');
+            const tech = answers.techStack.join(', ');
+
+            const prompt = `# Project: ${idea.title}
+
+## Overview
+${idea.reasoning}
+
+## Project Context
+- **Type**: ${types}
+- **Complexity**: ${answers.complexity}
+- **Target Audience**: ${answers.audience || 'General users'}
+
+## Problem Statement
+${answers.problems || 'Create an innovative solution in this space'}
+
+## Core Features (Must Have)
+${answers.coreFeatures || 'To be defined during implementation'}
+
+## Nice-to-Have Features (If Time Permits)
+${answers.niceFeatures || 'None specified'}
+
+## Technical Requirements
+- **Technology Stack**: ${tech}
+- **Developer Skills**: ${skills || 'General web development'}
+- **Additional Requirements**: ${answers.requirements || 'None specified'}
+
+## Implementation Guidelines
+Please build this application following these principles:
+
+1. **User Experience First**: Create an intuitive, clean interface that requires no tutorial
+2. **Progressive Enhancement**: Start with core functionality, then add enhancements
+3. **Responsive Design**: Ensure it works well on desktop and mobile devices
+4. **Code Quality**: Write clean, well-commented code that's easy to maintain
+5. **Performance**: Keep the app fast and lightweight
+6. **Accessibility**: Follow WCAG guidelines for inclusive design
+
+## Success Criteria
+- All core features are fully functional
+- Interface is intuitive and visually appealing
+- Code is well-organized and documented
+- App works across modern browsers
+- No critical bugs or errors
+
+## Deliverables
+1. Fully functional application
+2. Clean, commented source code
+3. Brief README with usage instructions
+4. Any necessary setup or deployment notes
+
+## Notes for Claude Code
+- Feel free to suggest improvements or alternative approaches
+- If anything is unclear, make reasonable assumptions and note them
+- Focus on delivering a working MVP first, then iterate
+- Prioritize simplicity and usability over complexity
+
+${answers.interests ? `\n## Personal Context\nDeveloper interests: ${answers.interests}` : ''}
+
+---
+Let's build something great! Please start by outlining your implementation approach, then proceed with development.`;
+
+            document.getElementById('finalPrompt').textContent = prompt;
+            nextStep();
+        }
+
+        function copyPrompt() {
+            const promptText = document.getElementById('finalPrompt').textContent;
+            navigator.clipboard.writeText(promptText).then(() => {
+                const btn = document.querySelector('.copy-btn');
+                btn.textContent = '✅ Copied! Ready to paste into Claude Code';
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.textContent = '📋 Copy to Clipboard';
+                    btn.classList.remove('copied');
+                }, 3000);
+            });
+        }
+
+        function resetGenerator() {
+            currentStep = 1;
+            Object.keys(answers).forEach(key => {
+                if (Array.isArray(answers[key])) {
+                    answers[key] = key === 'techStack' ? ['vanilla'] : [];
+                } else {
+                    answers[key] = '';
+                }
+            });
+
+            document.querySelectorAll('.step').forEach(step => step.classList.remove('active'));
+            document.getElementById('step1').classList.add('active');
+            updateProgress();
+
+            // Reset form inputs
+            document.querySelectorAll('input[type="text"], textarea').forEach(input => input.value = '');
+            document.querySelectorAll('.checkbox-item').forEach(item => {
+                item.classList.remove('selected');
+                item.querySelector('input[type="checkbox"]').checked = false;
+            });
+            document.querySelectorAll('.option').forEach(opt => opt.classList.remove('selected'));
+
+            // Reset vanilla tech to checked
+            const vanillaCheckbox = document.querySelector('#techStack input[value="vanilla"]');
+            if (vanillaCheckbox) {
+                vanillaCheckbox.checked = true;
+                vanillaCheckbox.closest('.checkbox-item').classList.add('selected');
+                answers.techStack = ['vanilla'];
+            }
+
+            window.scrollTo(0, 0);
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', () => {
+            updateProgress();
+
+            // Setup step 6 when user reaches it
+            const observer = new MutationObserver(() => {
+                if (currentStep === 6) {
+                    generateInspirationCards();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
