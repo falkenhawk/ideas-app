@@ -37,10 +37,12 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
         }
 
         .header h1 {
-            font-size: 1.8em;
+            font-size: 1.5em;
             display: flex;
             align-items: center;
             gap: 10px;
@@ -89,6 +91,8 @@
             display: block;
             cursor: crosshair;
             touch-action: none;
+            width: 100%;
+            height: auto;
         }
 
         .toolbar {
@@ -278,6 +282,10 @@
             .tool-section {
                 min-width: 200px;
             }
+
+            .header h1 {
+                font-size: 1.2em;
+            }
         }
 
         .intro-overlay {
@@ -298,6 +306,7 @@
             padding: 40px;
             border-radius: 20px;
             max-width: 500px;
+            margin: 20px;
             text-align: center;
         }
 
@@ -321,6 +330,11 @@
             margin-bottom: 15px;
         }
 
+        .intro-card input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
         .intro-card button {
             width: 100%;
             padding: 15px;
@@ -342,6 +356,16 @@
         .hidden {
             display: none;
         }
+
+        .error-message {
+            background: #ffe6e6;
+            color: #cc0000;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 0.9em;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -356,7 +380,8 @@
             • Draw together in real-time, no server needed!</p>
 
             <input type="text" id="roomInput" placeholder="Enter room name (e.g., 'my-room')" />
-            <button onclick="joinRoom()">Start Drawing!</button>
+            <button id="joinButton">Start Drawing!</button>
+            <div class="error-message" id="errorMessage"></div>
         </div>
     </div>
 
@@ -385,39 +410,39 @@
 
                 <div class="tool-section">
                     <h3>Colors</h3>
-                    <div class="color-palette">
-                        <div class="color-btn selected" style="background: #000000;" onclick="selectColor('#000000', this)"></div>
-                        <div class="color-btn" style="background: #ff0000;" onclick="selectColor('#ff0000', this)"></div>
-                        <div class="color-btn" style="background: #00ff00;" onclick="selectColor('#00ff00', this)"></div>
-                        <div class="color-btn" style="background: #0000ff;" onclick="selectColor('#0000ff', this)"></div>
-                        <div class="color-btn" style="background: #ffff00;" onclick="selectColor('#ffff00', this)"></div>
-                        <div class="color-btn" style="background: #ff00ff;" onclick="selectColor('#ff00ff', this)"></div>
-                        <div class="color-btn" style="background: #00ffff;" onclick="selectColor('#00ffff', this)"></div>
-                        <div class="color-btn" style="background: #ffffff; border: 2px solid #e0e0e0;" onclick="selectColor('#ffffff', this)"></div>
-                        <div class="color-btn" style="background: #ff8800;" onclick="selectColor('#ff8800', this)"></div>
-                        <div class="color-btn" style="background: #88ff00;" onclick="selectColor('#88ff00', this)"></div>
-                        <div class="color-btn" style="background: #0088ff;" onclick="selectColor('#0088ff', this)"></div>
-                        <div class="color-btn" style="background: #8800ff;" onclick="selectColor('#8800ff', this)"></div>
-                        <div class="color-btn" style="background: #ff0088;" onclick="selectColor('#ff0088', this)"></div>
-                        <div class="color-btn" style="background: #888888;" onclick="selectColor('#888888', this)"></div>
-                        <div class="color-btn" style="background: #cc6633;" onclick="selectColor('#cc6633', this)"></div>
-                        <div class="color-btn" style="background: #663399;" onclick="selectColor('#663399', this)"></div>
+                    <div class="color-palette" id="colorPalette">
+                        <div class="color-btn selected" style="background: #000000;" data-color="#000000"></div>
+                        <div class="color-btn" style="background: #ff0000;" data-color="#ff0000"></div>
+                        <div class="color-btn" style="background: #00ff00;" data-color="#00ff00"></div>
+                        <div class="color-btn" style="background: #0000ff;" data-color="#0000ff"></div>
+                        <div class="color-btn" style="background: #ffff00;" data-color="#ffff00"></div>
+                        <div class="color-btn" style="background: #ff00ff;" data-color="#ff00ff"></div>
+                        <div class="color-btn" style="background: #00ffff;" data-color="#00ffff"></div>
+                        <div class="color-btn" style="background: #ffffff; border: 2px solid #e0e0e0;" data-color="#ffffff"></div>
+                        <div class="color-btn" style="background: #ff8800;" data-color="#ff8800"></div>
+                        <div class="color-btn" style="background: #88ff00;" data-color="#88ff00"></div>
+                        <div class="color-btn" style="background: #0088ff;" data-color="#0088ff"></div>
+                        <div class="color-btn" style="background: #8800ff;" data-color="#8800ff"></div>
+                        <div class="color-btn" style="background: #ff0088;" data-color="#ff0088"></div>
+                        <div class="color-btn" style="background: #888888;" data-color="#888888"></div>
+                        <div class="color-btn" style="background: #cc6633;" data-color="#cc6633"></div>
+                        <div class="color-btn" style="background: #663399;" data-color="#663399"></div>
                     </div>
                 </div>
 
                 <div class="tool-section">
                     <h3>Brush Size</h3>
-                    <div class="brush-sizes">
-                        <div class="size-btn" onclick="selectSize(2, this)">
+                    <div class="brush-sizes" id="brushSizes">
+                        <div class="size-btn" data-size="2">
                             <div class="dot" style="width: 4px; height: 4px;"></div>
                         </div>
-                        <div class="size-btn selected" onclick="selectSize(5, this)">
+                        <div class="size-btn selected" data-size="5">
                             <div class="dot" style="width: 8px; height: 8px;"></div>
                         </div>
-                        <div class="size-btn" onclick="selectSize(10, this)">
+                        <div class="size-btn" data-size="10">
                             <div class="dot" style="width: 14px; height: 14px;"></div>
                         </div>
-                        <div class="size-btn" onclick="selectSize(20, this)">
+                        <div class="size-btn" data-size="20">
                             <div class="dot" style="width: 24px; height: 24px;"></div>
                         </div>
                     </div>
@@ -425,16 +450,16 @@
 
                 <div class="tool-section">
                     <h3>Tools</h3>
-                    <button class="tool-btn active" id="drawBtn" onclick="selectTool('draw')">
+                    <button class="tool-btn active" id="drawBtn" data-tool="draw">
                         ✏️ Draw
                     </button>
-                    <button class="tool-btn" id="eraseBtn" onclick="selectTool('erase')">
+                    <button class="tool-btn" id="eraseBtn" data-tool="erase">
                         🧹 Erase
                     </button>
                 </div>
 
                 <div class="tool-section">
-                    <button class="tool-btn clear-btn" onclick="clearCanvas()">
+                    <button class="tool-btn clear-btn" id="clearBtn">
                         🗑️ Clear Canvas
                     </button>
                 </div>
@@ -442,12 +467,11 @@
         </div>
     </div>
 
-    <!-- Import Yjs and y-webrtc from CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/yjs@13/dist/yjs.mjs" type="module"></script>
-    <script type="module">
-        import * as Y from 'https://cdn.jsdelivr.net/npm/yjs@13/dist/yjs.mjs';
-        import { WebrtcProvider } from 'https://cdn.jsdelivr.net/npm/y-webrtc@10/+esm';
+    <!-- Load Yjs libraries from CDN (UMD builds) -->
+    <script src="https://cdn.jsdelivr.net/npm/yjs@13.6.10/dist/yjs.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/y-webrtc@10.2.5/dist/y-webrtc.js"></script>
 
+    <script>
         // Canvas setup
         const canvas = document.getElementById('drawingCanvas');
         const ctx = canvas.getContext('2d');
@@ -468,66 +492,90 @@
 
         // Initialize Yjs document
         function initYjs(roomName) {
-            ydoc = new Y.Doc();
+            try {
+                console.log('Initializing Yjs with room:', roomName);
 
-            // Use WebRTC provider for peer-to-peer connection
-            provider = new WebrtcProvider(roomName, ydoc, {
-                signaling: [
-                    'wss://signaling.yjs.dev',
-                    'wss://y-webrtc-signaling-eu.herokuapp.com',
-                    'wss://y-webrtc-signaling-us.herokuapp.com'
-                ]
-            });
+                ydoc = new Y.Doc();
 
-            // Get shared array for drawing data
-            yarray = ydoc.getArray('drawing');
-
-            // Get awareness for peer tracking
-            awareness = provider.awareness;
-
-            // Listen for drawing events from other users
-            yarray.observe(event => {
-                event.changes.added.forEach(item => {
-                    const drawData = item.content.getContent()[0];
-                    drawLine(drawData.x1, drawData.y1, drawData.x2, drawData.y2, drawData.color, drawData.size, drawData.tool);
+                // Use WebRTC provider for peer-to-peer connection
+                provider = new WebrtcProvider(roomName, ydoc, {
+                    signaling: [
+                        'wss://signaling.yjs.dev',
+                        'wss://y-webrtc-signaling-eu.herokuapp.com',
+                        'wss://y-webrtc-signaling-us.herokuapp.com'
+                    ]
                 });
-            });
 
-            // Update connection status
-            provider.on('status', event => {
-                const statusIndicator = document.getElementById('statusIndicator');
-                const statusText = document.getElementById('statusText');
+                // Get shared array for drawing data
+                yarray = ydoc.getArray('drawing');
 
-                if (event.connected) {
-                    statusIndicator.classList.add('connected');
-                    statusText.textContent = 'Connected';
-                } else {
-                    statusIndicator.classList.remove('connected');
-                    statusText.textContent = 'Connecting...';
-                }
-            });
+                // Get awareness for peer tracking
+                awareness = provider.awareness;
 
-            // Update peer count
-            awareness.on('change', () => {
-                const peers = awareness.getStates().size;
-                const peersList = document.getElementById('peersList');
-                peersList.innerHTML = `<span class="peer-indicator"></span> You`;
-                if (peers > 1) {
-                    peersList.innerHTML += ` + ${peers - 1} other${peers > 2 ? 's' : ''}`;
-                }
-            });
+                // Listen for drawing events from other users
+                yarray.observe(event => {
+                    event.changes.added.forEach(item => {
+                        const content = item.content.getContent();
+                        if (content && content.length > 0) {
+                            const drawData = content[0];
+                            if (drawData && drawData.x1 !== undefined) {
+                                drawLine(drawData.x1, drawData.y1, drawData.x2, drawData.y2, drawData.color, drawData.size, drawData.tool);
+                            }
+                        }
+                    });
+                });
 
-            // Set room name display
-            document.getElementById('roomName').value = roomName;
+                // Update connection status
+                provider.on('status', event => {
+                    console.log('Provider status:', event);
+                    const statusIndicator = document.getElementById('statusIndicator');
+                    const statusText = document.getElementById('statusText');
+
+                    if (event.connected) {
+                        statusIndicator.classList.add('connected');
+                        statusText.textContent = 'Connected';
+                    } else {
+                        statusIndicator.classList.remove('connected');
+                        statusText.textContent = 'Connecting...';
+                    }
+                });
+
+                // Update peer count
+                awareness.on('change', () => {
+                    const peers = awareness.getStates().size;
+                    const peersList = document.getElementById('peersList');
+                    peersList.innerHTML = `<span class="peer-indicator"></span> You`;
+                    if (peers > 1) {
+                        peersList.innerHTML += ` + ${peers - 1} other${peers > 2 ? 's' : ''}`;
+                    }
+                });
+
+                // Set room name display
+                document.getElementById('roomName').value = roomName;
+
+                console.log('Yjs initialized successfully');
+            } catch (error) {
+                console.error('Error initializing Yjs:', error);
+                showError('Failed to initialize: ' + error.message);
+            }
+        }
+
+        // Show error message
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
         }
 
         // Join room function
-        window.joinRoom = function() {
+        document.getElementById('joinButton').addEventListener('click', function() {
             const roomInput = document.getElementById('roomInput');
             const roomName = roomInput.value.trim();
 
+            console.log('Join button clicked, room name:', roomName);
+
             if (!roomName) {
-                alert('Please enter a room name');
+                showError('Please enter a room name');
                 return;
             }
 
@@ -536,7 +584,14 @@
 
             // Initialize Yjs with room name
             initYjs(roomName);
-        };
+        });
+
+        // Also allow Enter key to join
+        document.getElementById('roomInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('joinButton').click();
+            }
+        });
 
         // Drawing functions
         function drawLine(x1, y1, x2, y2, color, size, tool) {
@@ -550,25 +605,42 @@
             ctx.stroke();
         }
 
-        function startDrawing(e) {
-            isDrawing = true;
+        function getCanvasCoords(e) {
             const rect = canvas.getBoundingClientRect();
             const scaleX = canvas.width / rect.width;
             const scaleY = canvas.height / rect.height;
 
-            lastX = (e.clientX - rect.left) * scaleX;
-            lastY = (e.clientY - rect.top) * scaleY;
+            let clientX, clientY;
+
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
+        }
+
+        function startDrawing(e) {
+            e.preventDefault();
+            isDrawing = true;
+            const coords = getCanvasCoords(e);
+            lastX = coords.x;
+            lastY = coords.y;
         }
 
         function draw(e) {
             if (!isDrawing) return;
+            e.preventDefault();
 
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-
-            const x = (e.clientX - rect.left) * scaleX;
-            const y = (e.clientY - rect.top) * scaleY;
+            const coords = getCanvasCoords(e);
+            const x = coords.x;
+            const y = coords.y;
 
             // Draw locally
             drawLine(lastX, lastY, x, y, currentColor, currentSize, currentTool);
@@ -590,20 +662,9 @@
             lastY = y;
         }
 
-        function stopDrawing() {
+        function stopDrawing(e) {
+            if (e) e.preventDefault();
             isDrawing = false;
-        }
-
-        // Touch support
-        function getTouchPos(e) {
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            const touch = e.touches[0];
-            return {
-                clientX: touch.clientX,
-                clientY: touch.clientY
-            };
         }
 
         // Event listeners for mouse
@@ -613,36 +674,45 @@
         canvas.addEventListener('mouseout', stopDrawing);
 
         // Event listeners for touch
-        canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            startDrawing(getTouchPos(e));
-        });
-        canvas.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            draw(getTouchPos(e));
-        });
+        canvas.addEventListener('touchstart', startDrawing);
+        canvas.addEventListener('touchmove', draw);
         canvas.addEventListener('touchend', stopDrawing);
+        canvas.addEventListener('touchcancel', stopDrawing);
 
-        // Tool selection functions
-        window.selectColor = function(color, element) {
-            currentColor = color;
-            document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('selected'));
-            element.classList.add('selected');
-        };
+        // Color selection
+        document.getElementById('colorPalette').addEventListener('click', function(e) {
+            if (e.target.classList.contains('color-btn')) {
+                currentColor = e.target.dataset.color;
+                document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('selected'));
+                e.target.classList.add('selected');
+            }
+        });
 
-        window.selectSize = function(size, element) {
-            currentSize = size;
-            document.querySelectorAll('.size-btn').forEach(btn => btn.classList.remove('selected'));
-            element.classList.add('selected');
-        };
+        // Brush size selection
+        document.getElementById('brushSizes').addEventListener('click', function(e) {
+            const sizeBtn = e.target.closest('.size-btn');
+            if (sizeBtn) {
+                currentSize = parseInt(sizeBtn.dataset.size);
+                document.querySelectorAll('.size-btn').forEach(btn => btn.classList.remove('selected'));
+                sizeBtn.classList.add('selected');
+            }
+        });
 
-        window.selectTool = function(tool) {
-            currentTool = tool;
+        // Tool selection
+        document.getElementById('drawBtn').addEventListener('click', function() {
+            currentTool = 'draw';
             document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
-            document.getElementById(tool === 'draw' ? 'drawBtn' : 'eraseBtn').classList.add('active');
-        };
+            this.classList.add('active');
+        });
 
-        window.clearCanvas = function() {
+        document.getElementById('eraseBtn').addEventListener('click', function() {
+            currentTool = 'erase';
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+            this.classList.add('active');
+        });
+
+        // Clear canvas
+        document.getElementById('clearBtn').addEventListener('click', function() {
             if (confirm('Clear the entire canvas? This will affect all users.')) {
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -652,11 +722,13 @@
                     yarray.delete(0, yarray.length);
                 }
             }
-        };
+        });
 
         // Set default canvas background
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        console.log('Drawing app initialized');
     </script>
 </body>
 </html>
