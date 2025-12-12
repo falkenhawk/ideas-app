@@ -1,4 +1,45 @@
-# 🚀 App Idea Generator
+# 🚀 Ideas App Collection
+
+A collection of interactive web applications including an App Idea Generator and a Collaborative Drawing App.
+
+## 🎨 Collaborative Drawing App (NEW!)
+
+A real-time collaborative drawing application inspired by Nintendo DS Pictochat! Draw together with friends using peer-to-peer technology.
+
+### Features
+
+- **Real-time Collaboration**: Draw simultaneously with multiple people
+- **Peer-to-Peer**: No server required - uses WebRTC for direct connections
+- **Room-based**: Create or join rooms by name
+- **Full Drawing Tools**: 16 colors, 4 brush sizes, draw/erase modes
+- **Pictochat Style**: Simple, fun interface inspired by Nintendo DS
+- **Mobile Friendly**: Works on touch screens and desktops
+
+### How to Use
+
+1. Open `draw.html` in your browser
+2. Enter a room name (e.g., "my-drawing-room")
+3. Share the room name with friends
+4. Start drawing together in real-time!
+
+### Technology
+
+- **Yjs**: CRDT-based collaborative editing (same tech used by Figma!)
+- **y-webrtc**: Peer-to-peer WebRTC provider
+- **HTML5 Canvas**: For drawing
+- **No backend needed**: Everything runs in the browser
+
+### Deployment
+
+Deploy anywhere that hosts static files:
+- **GitHub Pages**: Enable in repo settings → Pages
+- **Vercel**: Drag and drop or connect repo
+- **Netlify**: One-click deploy
+- **Surge.sh**: Run `surge ./`
+
+---
+
+## 🚀 App Idea Generator
 
 A beautiful, interactive web application that helps you discover your next great app or game idea and generates ready-to-use prompts for Claude Code.
 

@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Collaborative Drawing - Pictochat Style</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 1200px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 1.8em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9em;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff4444;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.connected {
+            background: #44ff44;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .canvas-container {
+            position: relative;
+            border: 3px solid #667eea;
+            border-radius: 10px;
+            overflow: hidden;
+            background: white;
+        }
+
+        canvas {
+            display: block;
+            cursor: crosshair;
+            touch-action: none;
+        }
+
+        .toolbar {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            padding: 20px;
+            background: #f8f9ff;
+            border-radius: 10px;
+            min-width: 200px;
+        }
+
+        .tool-section {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #e0e0e0;
+        }
+
+        .tool-section h3 {
+            color: #667eea;
+            font-size: 1em;
+            margin-bottom: 10px;
+        }
+
+        .color-palette {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+
+        .color-btn {
+            width: 40px;
+            height: 40px;
+            border: 3px solid transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .color-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .color-btn.selected {
+            border-color: #333;
+            transform: scale(1.15);
+        }
+
+        .brush-sizes {
+            display: flex;
+            gap: 10px;
+            justify-content: space-around;
+        }
+
+        .size-btn {
+            width: 45px;
+            height: 45px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .size-btn:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .size-btn.selected {
+            border-color: #667eea;
+            background: #667eea;
+        }
+
+        .size-btn .dot {
+            background: #333;
+            border-radius: 50%;
+        }
+
+        .size-btn.selected .dot {
+            background: white;
+        }
+
+        .tool-btn {
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            font-size: 0.95em;
+            font-weight: 600;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tool-btn:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .tool-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .clear-btn {
+            background: #ff4444;
+            color: white;
+            border-color: #ff4444;
+        }
+
+        .clear-btn:hover {
+            background: #cc0000;
+            border-color: #cc0000;
+        }
+
+        .room-info {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #e0e0e0;
+        }
+
+        .room-info input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+
+        .room-info input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .room-info button {
+            width: 100%;
+            padding: 10px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .room-info button:hover {
+            background: #5568d3;
+        }
+
+        .peers-list {
+            margin-top: 10px;
+            font-size: 0.85em;
+            color: #666;
+        }
+
+        .peer-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #44ff44;
+            margin-right: 5px;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+
+            .toolbar {
+                flex-direction: row;
+                overflow-x: auto;
+                min-width: unset;
+            }
+
+            .tool-section {
+                min-width: 200px;
+            }
+        }
+
+        .intro-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .intro-card {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            max-width: 500px;
+            text-align: center;
+        }
+
+        .intro-card h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+
+        .intro-card p {
+            color: #666;
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+
+        .intro-card input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1em;
+            margin-bottom: 15px;
+        }
+
+        .intro-card button {
+            width: 100%;
+            padding: 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .intro-card button:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Intro Overlay -->
+    <div class="intro-overlay" id="introOverlay">
+        <div class="intro-card">
+            <h2>🎨 Collaborative Drawing</h2>
+            <p>Welcome! This is a real-time collaborative drawing app, just like Pictochat!</p>
+            <p><strong>How it works:</strong></p>
+            <p>• Enter a room name to create or join a drawing session<br>
+            • Share the room name with your friends<br>
+            • Draw together in real-time, no server needed!</p>
+
+            <input type="text" id="roomInput" placeholder="Enter room name (e.g., 'my-room')" />
+            <button onclick="joinRoom()">Start Drawing!</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <h1>🎨 Collaborative Drawing</h1>
+            <div class="connection-status">
+                <div class="status-indicator" id="statusIndicator"></div>
+                <span id="statusText">Connecting...</span>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="canvas-container">
+                <canvas id="drawingCanvas" width="800" height="600"></canvas>
+            </div>
+
+            <div class="toolbar">
+                <div class="tool-section room-info">
+                    <h3>Room</h3>
+                    <input type="text" id="roomName" readonly placeholder="Room name" />
+                    <div class="peers-list" id="peersList">
+                        <span class="peer-indicator"></span> You
+                    </div>
+                </div>
+
+                <div class="tool-section">
+                    <h3>Colors</h3>
+                    <div class="color-palette">
+                        <div class="color-btn selected" style="background: #000000;" onclick="selectColor('#000000', this)"></div>
+                        <div class="color-btn" style="background: #ff0000;" onclick="selectColor('#ff0000', this)"></div>
+                        <div class="color-btn" style="background: #00ff00;" onclick="selectColor('#00ff00', this)"></div>
+                        <div class="color-btn" style="background: #0000ff;" onclick="selectColor('#0000ff', this)"></div>
+                        <div class="color-btn" style="background: #ffff00;" onclick="selectColor('#ffff00', this)"></div>
+                        <div class="color-btn" style="background: #ff00ff;" onclick="selectColor('#ff00ff', this)"></div>
+                        <div class="color-btn" style="background: #00ffff;" onclick="selectColor('#00ffff', this)"></div>
+                        <div class="color-btn" style="background: #ffffff; border: 2px solid #e0e0e0;" onclick="selectColor('#ffffff', this)"></div>
+                        <div class="color-btn" style="background: #ff8800;" onclick="selectColor('#ff8800', this)"></div>
+                        <div class="color-btn" style="background: #88ff00;" onclick="selectColor('#88ff00', this)"></div>
+                        <div class="color-btn" style="background: #0088ff;" onclick="selectColor('#0088ff', this)"></div>
+                        <div class="color-btn" style="background: #8800ff;" onclick="selectColor('#8800ff', this)"></div>
+                        <div class="color-btn" style="background: #ff0088;" onclick="selectColor('#ff0088', this)"></div>
+                        <div class="color-btn" style="background: #888888;" onclick="selectColor('#888888', this)"></div>
+                        <div class="color-btn" style="background: #cc6633;" onclick="selectColor('#cc6633', this)"></div>
+                        <div class="color-btn" style="background: #663399;" onclick="selectColor('#663399', this)"></div>
+                    </div>
+                </div>
+
+                <div class="tool-section">
+                    <h3>Brush Size</h3>
+                    <div class="brush-sizes">
+                        <div class="size-btn" onclick="selectSize(2, this)">
+                            <div class="dot" style="width: 4px; height: 4px;"></div>
+                        </div>
+                        <div class="size-btn selected" onclick="selectSize(5, this)">
+                            <div class="dot" style="width: 8px; height: 8px;"></div>
+                        </div>
+                        <div class="size-btn" onclick="selectSize(10, this)">
+                            <div class="dot" style="width: 14px; height: 14px;"></div>
+                        </div>
+                        <div class="size-btn" onclick="selectSize(20, this)">
+                            <div class="dot" style="width: 24px; height: 24px;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tool-section">
+                    <h3>Tools</h3>
+                    <button class="tool-btn active" id="drawBtn" onclick="selectTool('draw')">
+                        ✏️ Draw
+                    </button>
+                    <button class="tool-btn" id="eraseBtn" onclick="selectTool('erase')">
+                        🧹 Erase
+                    </button>
+                </div>
+
+                <div class="tool-section">
+                    <button class="tool-btn clear-btn" onclick="clearCanvas()">
+                        🗑️ Clear Canvas
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Yjs and y-webrtc from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/yjs@13/dist/yjs.mjs" type="module"></script>
+    <script type="module">
+        import * as Y from 'https://cdn.jsdelivr.net/npm/yjs@13/dist/yjs.mjs';
+        import { WebrtcProvider } from 'https://cdn.jsdelivr.net/npm/y-webrtc@10/+esm';
+
+        // Canvas setup
+        const canvas = document.getElementById('drawingCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Drawing state
+        let isDrawing = false;
+        let currentColor = '#000000';
+        let currentSize = 5;
+        let currentTool = 'draw';
+        let lastX = 0;
+        let lastY = 0;
+
+        // Yjs setup
+        let ydoc;
+        let provider;
+        let yarray;
+        let awareness;
+
+        // Initialize Yjs document
+        function initYjs(roomName) {
+            ydoc = new Y.Doc();
+
+            // Use WebRTC provider for peer-to-peer connection
+            provider = new WebrtcProvider(roomName, ydoc, {
+                signaling: [
+                    'wss://signaling.yjs.dev',
+                    'wss://y-webrtc-signaling-eu.herokuapp.com',
+                    'wss://y-webrtc-signaling-us.herokuapp.com'
+                ]
+            });
+
+            // Get shared array for drawing data
+            yarray = ydoc.getArray('drawing');
+
+            // Get awareness for peer tracking
+            awareness = provider.awareness;
+
+            // Listen for drawing events from other users
+            yarray.observe(event => {
+                event.changes.added.forEach(item => {
+                    const drawData = item.content.getContent()[0];
+                    drawLine(drawData.x1, drawData.y1, drawData.x2, drawData.y2, drawData.color, drawData.size, drawData.tool);
+                });
+            });
+
+            // Update connection status
+            provider.on('status', event => {
+                const statusIndicator = document.getElementById('statusIndicator');
+                const statusText = document.getElementById('statusText');
+
+                if (event.connected) {
+                    statusIndicator.classList.add('connected');
+                    statusText.textContent = 'Connected';
+                } else {
+                    statusIndicator.classList.remove('connected');
+                    statusText.textContent = 'Connecting...';
+                }
+            });
+
+            // Update peer count
+            awareness.on('change', () => {
+                const peers = awareness.getStates().size;
+                const peersList = document.getElementById('peersList');
+                peersList.innerHTML = `<span class="peer-indicator"></span> You`;
+                if (peers > 1) {
+                    peersList.innerHTML += ` + ${peers - 1} other${peers > 2 ? 's' : ''}`;
+                }
+            });
+
+            // Set room name display
+            document.getElementById('roomName').value = roomName;
+        }
+
+        // Join room function
+        window.joinRoom = function() {
+            const roomInput = document.getElementById('roomInput');
+            const roomName = roomInput.value.trim();
+
+            if (!roomName) {
+                alert('Please enter a room name');
+                return;
+            }
+
+            // Hide intro overlay
+            document.getElementById('introOverlay').classList.add('hidden');
+
+            // Initialize Yjs with room name
+            initYjs(roomName);
+        };
+
+        // Drawing functions
+        function drawLine(x1, y1, x2, y2, color, size, tool) {
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.strokeStyle = tool === 'erase' ? '#ffffff' : color;
+            ctx.lineWidth = size;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.stroke();
+        }
+
+        function startDrawing(e) {
+            isDrawing = true;
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+
+            lastX = (e.clientX - rect.left) * scaleX;
+            lastY = (e.clientY - rect.top) * scaleY;
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
+
+            // Draw locally
+            drawLine(lastX, lastY, x, y, currentColor, currentSize, currentTool);
+
+            // Broadcast to other users
+            if (yarray) {
+                yarray.push([{
+                    x1: lastX,
+                    y1: lastY,
+                    x2: x,
+                    y2: y,
+                    color: currentColor,
+                    size: currentSize,
+                    tool: currentTool
+                }]);
+            }
+
+            lastX = x;
+            lastY = y;
+        }
+
+        function stopDrawing() {
+            isDrawing = false;
+        }
+
+        // Touch support
+        function getTouchPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const touch = e.touches[0];
+            return {
+                clientX: touch.clientX,
+                clientY: touch.clientY
+            };
+        }
+
+        // Event listeners for mouse
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseout', stopDrawing);
+
+        // Event listeners for touch
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            startDrawing(getTouchPos(e));
+        });
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            draw(getTouchPos(e));
+        });
+        canvas.addEventListener('touchend', stopDrawing);
+
+        // Tool selection functions
+        window.selectColor = function(color, element) {
+            currentColor = color;
+            document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('selected'));
+            element.classList.add('selected');
+        };
+
+        window.selectSize = function(size, element) {
+            currentSize = size;
+            document.querySelectorAll('.size-btn').forEach(btn => btn.classList.remove('selected'));
+            element.classList.add('selected');
+        };
+
+        window.selectTool = function(tool) {
+            currentTool = tool;
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(tool === 'draw' ? 'drawBtn' : 'eraseBtn').classList.add('active');
+        };
+
+        window.clearCanvas = function() {
+            if (confirm('Clear the entire canvas? This will affect all users.')) {
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Clear the shared array
+                if (yarray) {
+                    yarray.delete(0, yarray.length);
+                }
+            }
+        };
+
+        // Set default canvas background
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    </script>
+</body>
+</html>
