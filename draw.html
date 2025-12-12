@@ -350,7 +350,7 @@
             <p><strong>How it works:</strong></p>
             <p>• Everyone who enters the same room name will be connected<br>
             • Draw together in real-time<br>
-            • Works peer-to-peer, no server needed!</p>
+            • Uses WebSocket for reliable connections!</p>
 
             <input type="text" id="roomInput" placeholder="Enter room name (e.g., 'art-party')" />
             <button id="joinButton">Start Drawing!</button>
@@ -443,12 +443,16 @@
         </div>
     </div>
 
-    <!-- Using Yjs with simpler WebSocket provider -->
-    <script src="https://cdn.jsdelivr.net/npm/yjs@13/dist/yjs.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/y-websocket@1/dist/y-websocket.min.js"></script>
+    <!-- Load Yjs and y-websocket from CDN -->
+    <script src="https://unpkg.com/yjs@13.6.10/dist/yjs.js"></script>
+    <script src="https://unpkg.com/y-websocket@1.5.0/dist/y-websocket.js"></script>
 
     <script>
         console.log('🎨 Drawing app starting...');
+
+        // Check if libraries loaded
+        console.log('Y available:', typeof Y !== 'undefined');
+        console.log('WebsocketProvider available:', typeof WebsocketProvider !== 'undefined');
 
         // Canvas setup
         const canvas = document.getElementById('drawingCanvas');
@@ -475,6 +479,16 @@
         function initCollaboration(roomName) {
             try {
                 console.log('🔗 Connecting to room:', roomName);
+
+                // Check if Y is available
+                if (typeof Y === 'undefined') {
+                    throw new Error('Yjs library not loaded');
+                }
+
+                // Check if WebsocketProvider is available
+                if (typeof WebsocketProvider === 'undefined') {
+                    throw new Error('WebsocketProvider not loaded');
+                }
 
                 ydoc = new Y.Doc();
 
@@ -527,7 +541,8 @@
                 console.log('✅ Collaboration initialized');
             } catch (error) {
                 console.error('❌ Error initializing collaboration:', error);
-                document.getElementById('statusText').textContent = 'Error - drawing locally only';
+                document.getElementById('statusText').textContent = 'Error: ' + error.message;
+                document.getElementById('peersList').innerHTML = 'Drawing locally only - collaboration unavailable';
             }
         }
 
@@ -544,7 +559,8 @@
             document.getElementById('introOverlay').classList.add('hidden');
             document.getElementById('roomName').value = roomName;
 
-            initCollaboration(roomName);
+            // Wait a bit for libraries to load if needed
+            setTimeout(() => initCollaboration(roomName), 100);
         });
 
         // Enter key to join
