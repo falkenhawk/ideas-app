@@ -368,6 +368,7 @@
 
                 <div class="tool-section">
                     <button class="tool-btn clear-btn" id="clearBtn">🗑️ Clear Canvas</button>
+                    <button class="tool-btn" id="saveBtn" style="margin-top: 10px; background: #28a745; color: white; border-color: #28a745;">💾 Save Drawing</button>
                 </div>
             </div>
         </div>
@@ -386,6 +387,10 @@
         let ws = null;
         let roomName = '';
         let peerCount = 0;
+        let serverUrl = '';
+        let reconnectAttempts = 0;
+        let reconnectTimeout = null;
+        let isIntentionalDisconnect = false;
 
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -394,7 +399,7 @@
             document.getElementById('statusMessage').textContent = msg;
         }
 
-        function updateConnectionStatus(connected, peers = 0) {
+        function updateConnectionStatus(connected, peers = 0, reconnecting = false) {
             const indicator = document.getElementById('statusIndicator');
             const text = document.getElementById('statusText');
             const peersList = document.getElementById('peersList');
@@ -403,6 +408,11 @@
                 indicator.classList.add('connected');
                 text.textContent = 'Connected';
                 peersList.textContent = `${peers} other${peers !== 1 ? 's' : ''} in room`;
+                reconnectAttempts = 0;
+            } else if (reconnecting) {
+                indicator.classList.remove('connected');
+                text.textContent = 'Reconnecting...';
+                peersList.textContent = 'Reconnecting...';
             } else {
                 indicator.classList.remove('connected');
                 text.textContent = 'Not connected';
@@ -410,8 +420,29 @@
             }
         }
 
-        function connectWebSocket(serverUrl, room) {
+        function scheduleReconnect() {
+            if (isIntentionalDisconnect || !serverUrl || !roomName) return;
+
+            const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+            reconnectAttempts++;
+
+            updateConnectionStatus(false, 0, true);
+
+            if (reconnectTimeout) clearTimeout(reconnectTimeout);
+            reconnectTimeout = setTimeout(() => {
+                console.log(`Reconnecting... (attempt ${reconnectAttempts})`);
+                connectWebSocket(serverUrl, roomName);
+            }, delay);
+        }
+
+        function connectWebSocket(url, room) {
+            serverUrl = url;
             roomName = room;
+            isIntentionalDisconnect = false;
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close();
+            }
 
             showStatus('Connecting to server...');
 
@@ -442,13 +473,14 @@
             };
 
             ws.onerror = (error) => {
-                showStatus('Connection error! Check server URL.');
-                updateConnectionStatus(false);
+                console.error('WebSocket error:', error);
             };
 
             ws.onclose = () => {
-                showStatus('Disconnected from server');
                 updateConnectionStatus(false);
+                if (!isIntentionalDisconnect) {
+                    scheduleReconnect();
+                }
             };
         }
 
@@ -574,6 +606,20 @@
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             send({ type: 'clear' });
+        });
+
+        document.getElementById('saveBtn').addEventListener('click', () => {
+            // Convert canvas to blob and download
+            canvas.toBlob((blob) => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `drawing-${Date.now()}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 'image/png');
         });
     </script>
 </body>
