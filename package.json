@@ -1,0 +1,15 @@
+{
+  "name": "collaborative-drawing-app",
+  "version": "1.0.0",
+  "description": "Collaborative drawing app with WebSocket server",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.14.2"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
