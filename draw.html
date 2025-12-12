@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Collaborative Drawing - Real P2P</title>
+    <title>Collaborative Drawing</title>
     <style>
         * {
             margin: 0;
@@ -269,25 +269,41 @@
             display: none;
         }
 
-        .status-message {
+        .server-url {
             font-size: 0.85em;
             color: #666;
-            margin-top: 10px;
-            padding: 8px;
-            background: #f0f0f0;
+            margin-top: 15px;
+            padding: 10px;
+            background: #fff3cd;
             border-radius: 5px;
+            border: 1px solid #ffc107;
+        }
+
+        .server-url input {
+            width: 100%;
+            padding: 8px;
+            margin-top: 8px;
+            font-size: 0.9em;
+            font-family: monospace;
         }
     </style>
 </head>
 <body>
     <div class="intro-overlay" id="introOverlay">
         <div class="intro-card">
-            <h2>🎨 Real P2P Drawing</h2>
-            <p><strong>Draw together across different devices!</strong></p>
-            <p>Enter the same room name on different phones/devices to draw together.</p>
-            <input type="text" id="roomInput" placeholder="Enter room name (e.g., 'party')" />
-            <button id="joinButton">Join Room</button>
-            <div class="status-message" id="statusMessage"></div>
+            <h2>🎨 Collaborative Drawing</h2>
+            <p><strong>Draw together in real-time!</strong></p>
+
+            <div class="server-url">
+                <strong>⚠️ Server URL Required</strong><br>
+                Enter your WebSocket server URL:
+                <input type="text" id="serverUrl" placeholder="wss://your-server.railway.app" value="ws://localhost:8080" />
+                <small>Deploy the server first (see server/README.md)</small>
+            </div>
+
+            <input type="text" id="roomInput" placeholder="Enter room name (e.g., 'party')" style="margin-top: 15px;" />
+            <button id="joinButton" style="margin-top: 10px;">Join Room</button>
+            <div id="statusMessage" style="margin-top: 10px; font-size: 0.85em; color: #666;"></div>
         </div>
     </div>
 
@@ -296,7 +312,7 @@
             <h1>🎨 Collaborative Drawing</h1>
             <div class="connection-status">
                 <div class="status-indicator" id="statusIndicator"></div>
-                <span id="statusText">Connecting...</span>
+                <span id="statusText">Not connected</span>
             </div>
         </div>
 
@@ -309,7 +325,7 @@
                 <div class="tool-section room-info">
                     <h3>Room</h3>
                     <input type="text" id="roomName" readonly />
-                    <div class="peers-list" id="peersList">Waiting for peers...</div>
+                    <div class="peers-list" id="peersList">Not connected</div>
                 </div>
 
                 <div class="tool-section">
@@ -357,7 +373,6 @@
         </div>
     </div>
 
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script>
         const canvas = document.getElementById('drawingCanvas');
         const ctx = canvas.getContext('2d');
@@ -368,9 +383,9 @@
         let currentTool = 'draw';
         let lastX = 0, lastY = 0;
 
-        let peer = null;
-        let connections = [];
+        let ws = null;
         let roomName = '';
+        let peerCount = 0;
 
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -379,109 +394,87 @@
             document.getElementById('statusMessage').textContent = msg;
         }
 
-        function updateConnectionStatus(connected) {
+        function updateConnectionStatus(connected, peers = 0) {
             const indicator = document.getElementById('statusIndicator');
             const text = document.getElementById('statusText');
+            const peersList = document.getElementById('peersList');
+
             if (connected) {
                 indicator.classList.add('connected');
                 text.textContent = 'Connected';
-                document.getElementById('peersList').textContent = `Connected (${connections.length} peer${connections.length !== 1 ? 's' : ''})`;
+                peersList.textContent = `${peers} other${peers !== 1 ? 's' : ''} in room`;
             } else {
                 indicator.classList.remove('connected');
-                text.textContent = 'Connecting...';
+                text.textContent = 'Not connected';
+                peersList.textContent = 'Not connected';
             }
         }
 
-        function initPeer(room) {
+        function connectWebSocket(serverUrl, room) {
             roomName = room;
-            const peerId = 'draw-' + room + '-' + Math.random().toString(36).substr(2, 9);
 
             showStatus('Connecting to server...');
 
-            peer = new Peer(peerId, {
-                host: '0.peerjs.com',
-                port: 443,
-                path: '/',
-                secure: true,
-                config: {
-                    iceServers: [
-                        { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:stun1.l.google.com:19302' }
-                    ]
-                }
-            });
+            ws = new WebSocket(serverUrl);
 
-            peer.on('open', (id) => {
-                showStatus('Connected! Looking for peers in room: ' + room);
-                updateConnectionStatus(true);
-                discoverPeers();
-            });
+            ws.onopen = () => {
+                showStatus('Connected! Joining room...');
+                ws.send(JSON.stringify({
+                    type: 'join',
+                    room: roomName
+                }));
+            };
 
-            peer.on('connection', (conn) => {
-                setupConnection(conn);
-            });
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
 
-            peer.on('error', (err) => {
-                showStatus('Error: ' + err.type);
-                console.error('Peer error:', err);
-            });
-        }
-
-        function discoverPeers() {
-            // Try to connect to potential peers in the room
-            for (let i = 0; i < 10; i++) {
-                const potentialPeerId = 'draw-' + roomName + '-' + i.toString(36).padStart(9, '0');
-                if (potentialPeerId !== peer.id) {
-                    setTimeout(() => {
-                        const conn = peer.connect(potentialPeerId, { reliable: true });
-                        setupConnection(conn);
-                    }, i * 100);
-                }
-            }
-        }
-
-        function setupConnection(conn) {
-            conn.on('open', () => {
-                if (!connections.find(c => c.peer === conn.peer)) {
-                    connections.push(conn);
-                    updateConnectionStatus(true);
+                if (data.type === 'joined') {
                     showStatus('');
-                }
-            });
-
-            conn.on('data', (data) => {
-                if (data.type === 'stroke') {
+                    peerCount = data.peers;
+                    updateConnectionStatus(true, peerCount);
+                    document.getElementById('introOverlay').classList.add('hidden');
+                } else if (data.type === 'stroke') {
                     drawLine(data.x1, data.y1, data.x2, data.y2, data.color, data.size, data.tool);
                 } else if (data.type === 'clear') {
                     ctx.fillStyle = '#ffffff';
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
                 }
-            });
+            };
 
-            conn.on('close', () => {
-                connections = connections.filter(c => c.peer !== conn.peer);
-                updateConnectionStatus(connections.length > 0);
-            });
-        }
+            ws.onerror = (error) => {
+                showStatus('Connection error! Check server URL.');
+                updateConnectionStatus(false);
+            };
 
-        function broadcast(data) {
-            connections.forEach(conn => {
-                if (conn.open) {
-                    conn.send(data);
-                }
-            });
+            ws.onclose = () => {
+                showStatus('Disconnected from server');
+                updateConnectionStatus(false);
+            };
         }
 
         document.getElementById('joinButton').addEventListener('click', () => {
+            const serverUrl = document.getElementById('serverUrl').value.trim();
             const room = document.getElementById('roomInput').value.trim();
-            if (!room) {
-                showStatus('Please enter a room name!');
+
+            if (!serverUrl) {
+                showStatus('Please enter server URL!');
                 return;
             }
-            document.getElementById('introOverlay').classList.add('hidden');
+
+            if (!room) {
+                showStatus('Please enter room name!');
+                return;
+            }
+
             document.getElementById('roomName').value = room;
-            initPeer(room);
+            connectWebSocket(serverUrl, room);
         });
+
+        function send(data) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify(data));
+            }
+        }
 
         function drawLine(x1, y1, x2, y2, color, size, tool) {
             ctx.beginPath();
@@ -517,15 +510,20 @@
             if (!isDrawing) return;
             e.preventDefault();
             const coords = getCanvasCoords(e);
+
             drawLine(lastX, lastY, coords.x, coords.y, currentColor, currentSize, currentTool);
-            broadcast({
+
+            send({
                 type: 'stroke',
-                x1: lastX, y1: lastY,
-                x2: coords.x, y2: coords.y,
+                x1: lastX,
+                y1: lastY,
+                x2: coords.x,
+                y2: coords.y,
                 color: currentColor,
                 size: currentSize,
                 tool: currentTool
             });
+
             lastX = coords.x;
             lastY = coords.y;
         }
@@ -575,7 +573,7 @@
         document.getElementById('clearBtn').addEventListener('click', () => {
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-            broadcast({ type: 'clear' });
+            send({ type: 'clear' });
         });
     </script>
 </body>
