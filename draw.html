@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Collaborative Drawing - Pictochat Style</title>
+    <title>Collaborative Drawing - Real P2P</title>
     <style>
         * {
             margin: 0;
@@ -43,9 +43,6 @@
 
         .header h1 {
             font-size: 1.5em;
-            display: flex;
-            align-items: center;
-            gap: 10px;
         }
 
         .connection-status {
@@ -59,6 +56,10 @@
             width: 12px;
             height: 12px;
             border-radius: 50%;
+            background: #ff4444;
+        }
+
+        .status-indicator.connected {
             background: #44ff44;
         }
 
@@ -70,7 +71,6 @@
         }
 
         .canvas-container {
-            position: relative;
             border: 3px solid #667eea;
             border-radius: 10px;
             overflow: hidden;
@@ -89,9 +89,9 @@
             display: flex;
             flex-direction: column;
             gap: 15px;
-            padding: 20px;
             background: #f8f9ff;
             border-radius: 10px;
+            padding: 20px;
             min-width: 200px;
         }
 
@@ -123,10 +123,6 @@
             transition: all 0.2s;
         }
 
-        .color-btn:hover {
-            transform: scale(1.1);
-        }
-
         .color-btn.selected {
             border-color: #333;
             transform: scale(1.15);
@@ -148,12 +144,6 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.2s;
-        }
-
-        .size-btn:hover {
-            border-color: #667eea;
-            background: #f8f9ff;
         }
 
         .size-btn.selected {
@@ -179,38 +169,17 @@
             font-size: 0.95em;
             font-weight: 600;
             transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .tool-btn:hover {
-            border-color: #667eea;
-            background: #f8f9ff;
         }
 
         .tool-btn.active {
             background: #667eea;
             color: white;
-            border-color: #667eea;
         }
 
         .clear-btn {
             background: #ff4444;
             color: white;
             border-color: #ff4444;
-        }
-
-        .clear-btn:hover {
-            background: #cc0000;
-            border-color: #cc0000;
-        }
-
-        .room-info {
-            background: white;
-            padding: 15px;
-            border-radius: 10px;
-            border: 2px solid #e0e0e0;
         }
 
         .room-info input {
@@ -222,43 +191,23 @@
             margin-bottom: 10px;
         }
 
-        .room-info input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
         .peers-list {
             margin-top: 10px;
             font-size: 0.85em;
             color: #666;
         }
 
-        .peer-indicator {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #44ff44;
-            margin-right: 5px;
-        }
-
         @media (max-width: 768px) {
             .main-content {
                 grid-template-columns: 1fr;
             }
-
             .toolbar {
                 flex-direction: row;
                 overflow-x: auto;
                 min-width: unset;
             }
-
             .tool-section {
                 min-width: 200px;
-            }
-
-            .header h1 {
-                font-size: 1.2em;
             }
         }
 
@@ -304,11 +253,6 @@
             margin-bottom: 15px;
         }
 
-        .intro-card input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
         .intro-card button {
             width: 100%;
             padding: 15px;
@@ -319,45 +263,31 @@
             font-size: 1.1em;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .intro-card button:hover {
-            background: #5568d3;
-            transform: translateY(-2px);
         }
 
         .hidden {
             display: none;
         }
 
-        .info-text {
-            font-size: 0.9em;
+        .status-message {
+            font-size: 0.85em;
             color: #666;
             margin-top: 10px;
-            padding: 10px;
+            padding: 8px;
             background: #f0f0f0;
-            border-radius: 8px;
+            border-radius: 5px;
         }
     </style>
 </head>
 <body>
-    <!-- Intro Overlay -->
     <div class="intro-overlay" id="introOverlay">
         <div class="intro-card">
-            <h2>🎨 Collaborative Drawing</h2>
-            <p>Draw together in real-time, just like Pictochat!</p>
-            <p><strong>How it works:</strong></p>
-            <p>• Open this page in multiple tabs on your device<br>
-            • Or share the room name with friends on the same WiFi<br>
-            • Draw together in real-time!</p>
-
-            <input type="text" id="roomInput" placeholder="Enter room name (e.g., 'art-party')" value="demo-room" />
-            <button id="joinButton">Start Drawing!</button>
-
-            <div class="info-text">
-                💡 Tip: Open this page in 2+ browser tabs to test it out!
-            </div>
+            <h2>🎨 Real P2P Drawing</h2>
+            <p><strong>Draw together across different devices!</strong></p>
+            <p>Enter the same room name on different phones/devices to draw together.</p>
+            <input type="text" id="roomInput" placeholder="Enter room name (e.g., 'party')" />
+            <button id="joinButton">Join Room</button>
+            <div class="status-message" id="statusMessage"></div>
         </div>
     </div>
 
@@ -366,7 +296,7 @@
             <h1>🎨 Collaborative Drawing</h1>
             <div class="connection-status">
                 <div class="status-indicator" id="statusIndicator"></div>
-                <span id="statusText">Ready</span>
+                <span id="statusText">Connecting...</span>
             </div>
         </div>
 
@@ -378,10 +308,8 @@
             <div class="toolbar">
                 <div class="tool-section room-info">
                     <h3>Room</h3>
-                    <input type="text" id="roomName" readonly placeholder="Room name" />
-                    <div class="peers-list" id="peersList">
-                        <span class="peer-indicator"></span> You
-                    </div>
+                    <input type="text" id="roomName" readonly />
+                    <div class="peers-list" id="peersList">Waiting for peers...</div>
                 </div>
 
                 <div class="tool-section">
@@ -394,7 +322,7 @@
                         <div class="color-btn" style="background: #ffff00;" data-color="#ffff00"></div>
                         <div class="color-btn" style="background: #ff00ff;" data-color="#ff00ff"></div>
                         <div class="color-btn" style="background: #00ffff;" data-color="#00ffff"></div>
-                        <div class="color-btn" style="background: #ffffff; border: 2px solid #e0e0e0;" data-color="#ffffff"></div>
+                        <div class="color-btn" style="background: #ffffff; border: 2px solid #ccc;" data-color="#ffffff"></div>
                         <div class="color-btn" style="background: #ff8800;" data-color="#ff8800"></div>
                         <div class="color-btn" style="background: #88ff00;" data-color="#88ff00"></div>
                         <div class="color-btn" style="background: #0088ff;" data-color="#0088ff"></div>
@@ -409,114 +337,152 @@
                 <div class="tool-section">
                     <h3>Brush Size</h3>
                     <div class="brush-sizes" id="brushSizes">
-                        <div class="size-btn" data-size="2">
-                            <div class="dot" style="width: 4px; height: 4px;"></div>
-                        </div>
-                        <div class="size-btn selected" data-size="5">
-                            <div class="dot" style="width: 8px; height: 8px;"></div>
-                        </div>
-                        <div class="size-btn" data-size="10">
-                            <div class="dot" style="width: 14px; height: 14px;"></div>
-                        </div>
-                        <div class="size-btn" data-size="20">
-                            <div class="dot" style="width: 24px; height: 24px;"></div>
-                        </div>
+                        <div class="size-btn" data-size="2"><div class="dot" style="width: 4px; height: 4px;"></div></div>
+                        <div class="size-btn selected" data-size="5"><div class="dot" style="width: 8px; height: 8px;"></div></div>
+                        <div class="size-btn" data-size="10"><div class="dot" style="width: 14px; height: 14px;"></div></div>
+                        <div class="size-btn" data-size="20"><div class="dot" style="width: 24px; height: 24px;"></div></div>
                     </div>
                 </div>
 
                 <div class="tool-section">
                     <h3>Tools</h3>
-                    <button class="tool-btn active" id="drawBtn">
-                        ✏️ Draw
-                    </button>
-                    <button class="tool-btn" id="eraseBtn">
-                        🧹 Erase
-                    </button>
+                    <button class="tool-btn active" id="drawBtn">✏️ Draw</button>
+                    <button class="tool-btn" id="eraseBtn">🧹 Erase</button>
                 </div>
 
                 <div class="tool-section">
-                    <button class="tool-btn clear-btn" id="clearBtn">
-                        🗑️ Clear Canvas
-                    </button>
+                    <button class="tool-btn clear-btn" id="clearBtn">🗑️ Clear Canvas</button>
                 </div>
             </div>
         </div>
     </div>
 
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script>
-        // Canvas setup
         const canvas = document.getElementById('drawingCanvas');
         const ctx = canvas.getContext('2d');
 
-        // Drawing state
         let isDrawing = false;
         let currentColor = '#000000';
         let currentSize = 5;
         let currentTool = 'draw';
-        let lastX = 0;
-        let lastY = 0;
+        let lastX = 0, lastY = 0;
 
-        // BroadcastChannel for local collaboration (works between tabs!)
-        let channel = null;
+        let peer = null;
+        let connections = [];
         let roomName = '';
 
-        // Set default canvas background
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Initialize collaboration
-        function initCollaboration(room) {
+        function showStatus(msg) {
+            document.getElementById('statusMessage').textContent = msg;
+        }
+
+        function updateConnectionStatus(connected) {
+            const indicator = document.getElementById('statusIndicator');
+            const text = document.getElementById('statusText');
+            if (connected) {
+                indicator.classList.add('connected');
+                text.textContent = 'Connected';
+                document.getElementById('peersList').textContent = `Connected (${connections.length} peer${connections.length !== 1 ? 's' : ''})`;
+            } else {
+                indicator.classList.remove('connected');
+                text.textContent = 'Connecting...';
+            }
+        }
+
+        function initPeer(room) {
             roomName = room;
+            const peerId = 'draw-' + room + '-' + Math.random().toString(36).substr(2, 9);
 
-            // Create broadcast channel
-            channel = new BroadcastChannel('drawing-' + roomName);
+            showStatus('Connecting to server...');
 
-            // Listen for messages from other tabs
-            channel.onmessage = (event) => {
-                const data = event.data;
+            peer = new Peer(peerId, {
+                host: '0.peerjs.com',
+                port: 443,
+                path: '/',
+                secure: true,
+                config: {
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' }
+                    ]
+                }
+            });
 
+            peer.on('open', (id) => {
+                showStatus('Connected! Looking for peers in room: ' + room);
+                updateConnectionStatus(true);
+                discoverPeers();
+            });
+
+            peer.on('connection', (conn) => {
+                setupConnection(conn);
+            });
+
+            peer.on('error', (err) => {
+                showStatus('Error: ' + err.type);
+                console.error('Peer error:', err);
+            });
+        }
+
+        function discoverPeers() {
+            // Try to connect to potential peers in the room
+            for (let i = 0; i < 10; i++) {
+                const potentialPeerId = 'draw-' + roomName + '-' + i.toString(36).padStart(9, '0');
+                if (potentialPeerId !== peer.id) {
+                    setTimeout(() => {
+                        const conn = peer.connect(potentialPeerId, { reliable: true });
+                        setupConnection(conn);
+                    }, i * 100);
+                }
+            }
+        }
+
+        function setupConnection(conn) {
+            conn.on('open', () => {
+                if (!connections.find(c => c.peer === conn.peer)) {
+                    connections.push(conn);
+                    updateConnectionStatus(true);
+                    showStatus('');
+                }
+            });
+
+            conn.on('data', (data) => {
                 if (data.type === 'stroke') {
                     drawLine(data.x1, data.y1, data.x2, data.y2, data.color, data.size, data.tool);
                 } else if (data.type === 'clear') {
                     ctx.fillStyle = '#ffffff';
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
-                } else if (data.type === 'hello') {
-                    // Someone joined, say hello back
-                    channel.postMessage({ type: 'hello-back' });
-                    updatePeerCount();
                 }
-            };
+            });
 
-            // Say hello to other tabs
-            channel.postMessage({ type: 'hello' });
-
-            document.getElementById('statusText').textContent = 'Connected';
-            document.getElementById('peersList').innerHTML = '<span class="peer-indicator"></span> Drawing together!';
+            conn.on('close', () => {
+                connections = connections.filter(c => c.peer !== conn.peer);
+                updateConnectionStatus(connections.length > 0);
+            });
         }
 
-        function updatePeerCount() {
-            // This is approximate - just for visual feedback
-            document.getElementById('peersList').innerHTML = '<span class="peer-indicator"></span> Drawing together!';
+        function broadcast(data) {
+            connections.forEach(conn => {
+                if (conn.open) {
+                    conn.send(data);
+                }
+            });
         }
 
-        // Join room
-        document.getElementById('joinButton').addEventListener('click', function() {
-            const room = document.getElementById('roomInput').value.trim() || 'demo-room';
-
+        document.getElementById('joinButton').addEventListener('click', () => {
+            const room = document.getElementById('roomInput').value.trim();
+            if (!room) {
+                showStatus('Please enter a room name!');
+                return;
+            }
             document.getElementById('introOverlay').classList.add('hidden');
             document.getElementById('roomName').value = room;
-
-            initCollaboration(room);
+            initPeer(room);
         });
 
-        // Enter key to join
-        document.getElementById('roomInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                document.getElementById('joinButton').click();
-            }
-        });
-
-        // Drawing functions
         function drawLine(x1, y1, x2, y2, color, size, tool) {
             ctx.beginPath();
             ctx.moveTo(x1, y1);
@@ -532,19 +498,10 @@
             const rect = canvas.getBoundingClientRect();
             const scaleX = canvas.width / rect.width;
             const scaleY = canvas.height / rect.height;
-
-            let clientX, clientY;
-            if (e.touches && e.touches.length > 0) {
-                clientX = e.touches[0].clientX;
-                clientY = e.touches[0].clientY;
-            } else {
-                clientX = e.clientX;
-                clientY = e.clientY;
-            }
-
+            const touch = e.touches && e.touches[0];
             return {
-                x: (clientX - rect.left) * scaleX,
-                y: (clientY - rect.top) * scaleY
+                x: ((touch ? touch.clientX : e.clientX) - rect.left) * scaleX,
+                y: ((touch ? touch.clientY : e.clientY) - rect.top) * scaleY
             };
         }
 
@@ -559,30 +516,18 @@
         function draw(e) {
             if (!isDrawing) return;
             e.preventDefault();
-
             const coords = getCanvasCoords(e);
-            const x = coords.x;
-            const y = coords.y;
-
-            // Draw locally
-            drawLine(lastX, lastY, x, y, currentColor, currentSize, currentTool);
-
-            // Broadcast to other tabs
-            if (channel) {
-                channel.postMessage({
-                    type: 'stroke',
-                    x1: lastX,
-                    y1: lastY,
-                    x2: x,
-                    y2: y,
-                    color: currentColor,
-                    size: currentSize,
-                    tool: currentTool
-                });
-            }
-
-            lastX = x;
-            lastY = y;
+            drawLine(lastX, lastY, coords.x, coords.y, currentColor, currentSize, currentTool);
+            broadcast({
+                type: 'stroke',
+                x1: lastX, y1: lastY,
+                x2: coords.x, y2: coords.y,
+                color: currentColor,
+                size: currentSize,
+                tool: currentTool
+            });
+            lastX = coords.x;
+            lastY = coords.y;
         }
 
         function stopDrawing(e) {
@@ -590,59 +535,47 @@
             isDrawing = false;
         }
 
-        // Mouse events
         canvas.addEventListener('mousedown', startDrawing);
         canvas.addEventListener('mousemove', draw);
         canvas.addEventListener('mouseup', stopDrawing);
         canvas.addEventListener('mouseout', stopDrawing);
-
-        // Touch events
         canvas.addEventListener('touchstart', startDrawing);
         canvas.addEventListener('touchmove', draw);
         canvas.addEventListener('touchend', stopDrawing);
-        canvas.addEventListener('touchcancel', stopDrawing);
 
-        // Color selection
-        document.getElementById('colorPalette').addEventListener('click', function(e) {
+        document.getElementById('colorPalette').addEventListener('click', (e) => {
             if (e.target.classList.contains('color-btn')) {
                 currentColor = e.target.dataset.color;
-                document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('selected'));
+                document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('selected'));
                 e.target.classList.add('selected');
             }
         });
 
-        // Brush size
-        document.getElementById('brushSizes').addEventListener('click', function(e) {
-            const sizeBtn = e.target.closest('.size-btn');
-            if (sizeBtn) {
-                currentSize = parseInt(sizeBtn.dataset.size);
-                document.querySelectorAll('.size-btn').forEach(btn => btn.classList.remove('selected'));
-                sizeBtn.classList.add('selected');
+        document.getElementById('brushSizes').addEventListener('click', (e) => {
+            const btn = e.target.closest('.size-btn');
+            if (btn) {
+                currentSize = parseInt(btn.dataset.size);
+                document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
             }
         });
 
-        // Tools
         document.getElementById('drawBtn').addEventListener('click', function() {
             currentTool = 'draw';
-            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('eraseBtn').classList.remove('active');
             this.classList.add('active');
         });
 
         document.getElementById('eraseBtn').addEventListener('click', function() {
             currentTool = 'erase';
-            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('drawBtn').classList.remove('active');
             this.classList.add('active');
         });
 
-        // Clear canvas
-        document.getElementById('clearBtn').addEventListener('click', function() {
+        document.getElementById('clearBtn').addEventListener('click', () => {
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Tell other tabs to clear too
-            if (channel) {
-                channel.postMessage({ type: 'clear' });
-            }
+            broadcast({ type: 'clear' });
         });
     </script>
 </body>
