@@ -842,10 +842,10 @@
             }
         }
 
-        // Redo most recently deleted OWN stroke
+        // Redo first deleted OWN stroke (LIFO: first undone = first redone)
         function redo() {
-            // Find most recently deleted OWN stroke (from end of ownStrokeIndices)
-            for (let i = ownStrokeIndices.length - 1; i >= 0; i--) {
+            // Find first deleted OWN stroke (from start of ownStrokeIndices)
+            for (let i = 0; i < ownStrokeIndices.length; i++) {
                 const strokeIndex = ownStrokeIndices[i];
                 if (deletedIndices.has(strokeIndex)) {
                     deletedIndices.delete(strokeIndex);
@@ -1127,16 +1127,17 @@
             // Add to OWN strokes for undo/redo
             ownStrokeIndices.push(strokeIndex);
 
-            // When drawing new stroke, clear redo for any of YOUR deleted strokes after this point
-            // Keep track of which own strokes to remove from ownStrokeIndices
+            // When drawing new stroke, clear redo stack for YOUR deleted strokes
+            // Remove deleted strokes from ownStrokeIndices (can't redo them anymore)
+            // BUT keep them in deletedIndices so they stay hidden
             const newOwnIndices = [];
             for (let i = 0; i < ownStrokeIndices.length - 1; i++) { // -1 to exclude the one we just added
                 const idx = ownStrokeIndices[i];
                 if (!deletedIndices.has(idx)) {
-                    newOwnIndices.push(idx);
-                } else {
-                    deletedIndices.delete(idx); // Remove from deleted
+                    newOwnIndices.push(idx); // Keep non-deleted strokes
                 }
+                // Deleted strokes are NOT added to newOwnIndices (redo stack cleared)
+                // but STAY in deletedIndices (remain hidden)
             }
             newOwnIndices.push(strokeIndex); // Add current stroke
             ownStrokeIndices = newOwnIndices;
