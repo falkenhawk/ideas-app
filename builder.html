@@ -363,6 +363,40 @@
                 bottom: 10px;
             }
         }
+
+        #debug-message {
+            position: fixed;
+            bottom: 180px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 200;
+            display: none;
+            max-width: 80%;
+            text-align: center;
+        }
+
+        #debug-message.show {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+
+        #debug-message.error {
+            background: rgba(239, 68, 68, 0.95);
+        }
+
+        #debug-message.success {
+            background: rgba(34, 197, 94, 0.95);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
     </style>
 </head>
 <body>
@@ -434,6 +468,8 @@
         📱 Tap 🔨 to place | Drag to rotate view | Pinch to zoom
     </div>
 
+    <div id="debug-message"></div>
+
     <script type="importmap">
     {
         "imports": {
@@ -461,6 +497,18 @@
         const BLOCK_SIZE = 1;
 
         // UI Helper functions
+        let messageTimeout;
+        function showMessage(text, type = 'info') {
+            const msgDiv = document.getElementById('debug-message');
+            msgDiv.textContent = text;
+            msgDiv.className = 'show ' + type;
+
+            if (messageTimeout) clearTimeout(messageTimeout);
+            messageTimeout = setTimeout(() => {
+                msgDiv.classList.remove('show');
+            }, 3000);
+        }
+
         window.toggleToolbar = function() {
             const toolbar = document.getElementById('toolbar');
             const toggleBtn = document.getElementById('toolbar-toggle');
@@ -476,12 +524,8 @@
         };
 
         window.placeBlockAtCenter = function() {
-            console.log('placeBlockAtCenter called');
-            console.log('WebSocket state:', ws ? ws.readyState : 'no ws');
-            console.log('Mode:', currentMode, 'Shape:', currentShape, 'Color:', currentColor);
-
             if (!ws || ws.readyState !== WebSocket.OPEN) {
-                console.log('WebSocket not connected!');
+                showMessage('❌ Not connected to server!', 'error');
                 return;
             }
 
@@ -489,77 +533,70 @@
             raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
             const intersects = raycaster.intersectObjects(scene.children, true);
 
-            console.log('Intersects found:', intersects.length);
+            if (intersects.length === 0) {
+                showMessage('❌ Aim crosshair at ground or block!', 'error');
+                return;
+            }
 
-            if (intersects.length > 0) {
-                const intersect = intersects[0];
-                console.log('First intersect:', intersect.object.userData);
+            const intersect = intersects[0];
 
-                if (currentMode === 'delete') {
-                    // Delete mode: remove the block at center
-                    if (intersect.object.userData.blockId) {
-                        const blockId = intersect.object.userData.blockId;
-                        console.log('Deleting block:', blockId);
-                        send({
-                            type: 'removeBlock',
-                            blockId: blockId
-                        });
-                    } else {
-                        console.log('No blockId on intersected object');
-                    }
+            if (currentMode === 'delete') {
+                // Delete mode
+                if (intersect.object.userData.blockId) {
+                    const blockId = intersect.object.userData.blockId;
+                    send({
+                        type: 'removeBlock',
+                        blockId: blockId
+                    });
+                    showMessage('🗑️ Block deleted!', 'success');
                 } else {
-                    // Build mode: place a new block
-                    let position = null;
-
-                    if (intersect.object.userData.isGround) {
-                        // Clicking on ground
-                        console.log('Placing on ground');
-                        position = new THREE.Vector3();
-                        position.copy(intersect.point);
-                        position.y = BLOCK_SIZE / 2;
-                    } else if (intersect.object.userData.blockId) {
-                        // Clicking on existing block
-                        console.log('Placing adjacent to block');
-                        position = new THREE.Vector3();
-                        position.copy(intersect.point);
-                        position.add(intersect.face.normal);
-                        position.divideScalar(BLOCK_SIZE).floor().multiplyScalar(BLOCK_SIZE);
-                        position.addScalar(BLOCK_SIZE / 2);
-                    } else {
-                        console.log('Intersected with unknown object:', intersect.object.type);
-                    }
-
-                    if (position) {
-                        // Snap to grid
-                        position.x = Math.round(position.x);
-                        position.y = Math.max(BLOCK_SIZE / 2, Math.round(position.y));
-                        position.z = Math.round(position.z);
-
-                        console.log('Placing block at:', position);
-
-                        // Check bounds
-                        if (Math.abs(position.x) <= GRID_SIZE / 2 &&
-                            Math.abs(position.z) <= GRID_SIZE / 2 &&
-                            position.y > 0) {
-
-                            const blockId = `${Date.now()}_${Math.random()}`;
-                            console.log('Sending addBlock message:', blockId);
-                            send({
-                                type: 'addBlock',
-                                blockId: blockId,
-                                x: position.x,
-                                y: position.y,
-                                z: position.z,
-                                shape: currentShape,
-                                color: currentColor
-                            });
-                        } else {
-                            console.log('Position out of bounds:', position);
-                        }
-                    }
+                    showMessage('❌ Aim at a block to delete!', 'error');
                 }
             } else {
-                console.log('No intersections found! Camera position:', camera.position);
+                // Build mode
+                let position = null;
+
+                if (intersect.object.userData.isGround) {
+                    position = new THREE.Vector3();
+                    position.copy(intersect.point);
+                    position.y = BLOCK_SIZE / 2;
+                } else if (intersect.object.userData.blockId) {
+                    position = new THREE.Vector3();
+                    position.copy(intersect.point);
+                    position.add(intersect.face.normal);
+                    position.divideScalar(BLOCK_SIZE).floor().multiplyScalar(BLOCK_SIZE);
+                    position.addScalar(BLOCK_SIZE / 2);
+                } else {
+                    showMessage('❌ Can only place on ground or blocks!', 'error');
+                    return;
+                }
+
+                if (position) {
+                    // Snap to grid
+                    position.x = Math.round(position.x);
+                    position.y = Math.max(BLOCK_SIZE / 2, Math.round(position.y));
+                    position.z = Math.round(position.z);
+
+                    // Check bounds
+                    if (Math.abs(position.x) > GRID_SIZE / 2 ||
+                        Math.abs(position.z) > GRID_SIZE / 2 ||
+                        position.y <= 0) {
+                        showMessage('❌ Too far from center!', 'error');
+                        return;
+                    }
+
+                    const blockId = `${Date.now()}_${Math.random()}`;
+                    send({
+                        type: 'addBlock',
+                        blockId: blockId,
+                        x: position.x,
+                        y: position.y,
+                        z: position.z,
+                        shape: currentShape,
+                        color: currentColor
+                    });
+                    showMessage('✅ Block placed!', 'success');
+                }
             }
         };
 
