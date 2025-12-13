@@ -90,6 +90,36 @@ async function initDatabase() {
             CREATE INDEX IF NOT EXISTS idx_room_session_active ON strokes (room_name, session_id, deleted)
         `);
 
+        // Create blocks table for 3D builder
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS blocks (
+                id SERIAL PRIMARY KEY,
+                room_name VARCHAR(255) NOT NULL,
+                session_id VARCHAR(50) NOT NULL,
+                block_id VARCHAR(100) NOT NULL,
+                x REAL NOT NULL,
+                y REAL NOT NULL,
+                z REAL NOT NULL,
+                shape VARCHAR(50) NOT NULL,
+                color VARCHAR(20) NOT NULL,
+                deleted BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        // Create indices for blocks
+        await pool.query(`
+            CREATE INDEX IF NOT EXISTS idx_blocks_room_session ON blocks (room_name, session_id)
+        `);
+
+        await pool.query(`
+            CREATE INDEX IF NOT EXISTS idx_blocks_room_session_active ON blocks (room_name, session_id, deleted)
+        `);
+
+        await pool.query(`
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_blocks_block_id ON blocks (room_name, session_id, block_id)
+        `);
+
         console.log('Database tables initialized and migrated');
     } catch (error) {
         console.error('Error initializing database:', error);
@@ -392,6 +422,91 @@ async function createNewSession(roomName) {
     return newSessionId;
 }
 
+// Block persistence functions (for 3D builder)
+async function loadRoomBlocks(roomName) {
+    const sessionId = await getCurrentSessionId(roomName);
+
+    if (useDatabase && pool) {
+        try {
+            const result = await pool.query(
+                'SELECT block_id, x, y, z, shape, color FROM blocks WHERE room_name = $1 AND session_id = $2 AND deleted = FALSE ORDER BY created_at ASC',
+                [roomName, sessionId]
+            );
+            return result.rows;
+        } catch (error) {
+            console.error('Error loading blocks:', error);
+            return [];
+        }
+    } else {
+        // File-based fallback
+        const filePath = getBlocksFilePath(roomName, sessionId);
+        try {
+            const data = fs.readFileSync(filePath, 'utf8');
+            const world = JSON.parse(data);
+            return world.blocks.filter(b => !b.deleted);
+        } catch (error) {
+            return [];
+        }
+    }
+}
+
+async function saveBlock(roomName, block) {
+    const sessionId = await getCurrentSessionId(roomName);
+
+    if (useDatabase && pool) {
+        try {
+            await pool.query(
+                'INSERT INTO blocks (room_name, session_id, block_id, x, y, z, shape, color) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+                [roomName, sessionId, block.blockId, block.x, block.y, block.z, block.shape, block.color]
+            );
+        } catch (error) {
+            console.error('Error saving block:', error);
+        }
+    } else {
+        // File-based fallback
+        const filePath = getBlocksFilePath(roomName, sessionId);
+        try {
+            let world = { blocks: [] };
+            if (fs.existsSync(filePath)) {
+                world = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+            }
+            world.blocks.push(block);
+            fs.writeFileSync(filePath, JSON.stringify(world, null, 2));
+        } catch (error) {
+            console.error('Error saving block:', error);
+        }
+    }
+}
+
+async function removeBlock(roomName, blockId) {
+    const sessionId = await getCurrentSessionId(roomName);
+
+    if (useDatabase && pool) {
+        try {
+            await pool.query(
+                'UPDATE blocks SET deleted = TRUE WHERE room_name = $1 AND session_id = $2 AND block_id = $3',
+                [roomName, sessionId, blockId]
+            );
+        } catch (error) {
+            console.error('Error removing block:', error);
+        }
+    } else {
+        // File-based fallback
+        const filePath = getBlocksFilePath(roomName, sessionId);
+        try {
+            const data = fs.readFileSync(filePath, 'utf8');
+            const world = JSON.parse(data);
+            const block = world.blocks.find(b => b.blockId === blockId);
+            if (block) {
+                block.deleted = true;
+            }
+            fs.writeFileSync(filePath, JSON.stringify(world, null, 2));
+        } catch (error) {
+            console.error('Error removing block:', error);
+        }
+    }
+}
+
 // File-based helper functions (fallback)
 function getSafeRoomName(roomName) {
     return roomName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
@@ -401,6 +516,15 @@ function getRoomFilePath(roomName, sessionId) {
     const safeName = getSafeRoomName(roomName);
     const DRAWINGS_DIR = path.join(__dirname, 'drawings');
     return path.join(DRAWINGS_DIR, `${safeName}_${sessionId}.json`);
+}
+
+function getBlocksFilePath(roomName, sessionId) {
+    const safeName = getSafeRoomName(roomName);
+    const WORLDS_DIR = path.join(__dirname, 'worlds');
+    if (!fs.existsSync(WORLDS_DIR)) {
+        fs.mkdirSync(WORLDS_DIR, { recursive: true });
+    }
+    return path.join(WORLDS_DIR, `${safeName}_${sessionId}.json`);
 }
 
 wss.on('connection', (ws) => {
@@ -425,12 +549,16 @@ wss.on('connection', (ws) => {
                 // Load and send previous drawing
                 const drawing = await loadRoomDrawing(currentRoom);
 
-                // Send confirmation with drawing history
+                // Load and send previous blocks (for 3D builder)
+                const blocks = await loadRoomBlocks(currentRoom);
+
+                // Send confirmation with drawing history and blocks
                 ws.send(JSON.stringify({
                     type: 'joined',
                     room: currentRoom,
                     peers: rooms.get(currentRoom).size - 1,
-                    strokes: drawing.strokes
+                    strokes: drawing.strokes,
+                    blocks: blocks
                 }));
 
             } else if (data.type === 'stroke') {
@@ -500,6 +628,47 @@ wss.on('connection', (ws) => {
                 }
 
                 // Broadcast clear to other clients
+                if (currentRoom && rooms.has(currentRoom)) {
+                    const roomClients = rooms.get(currentRoom);
+                    const messageStr = JSON.stringify(data);
+
+                    roomClients.forEach((client) => {
+                        if (client !== ws && client.readyState === WebSocket.OPEN) {
+                            client.send(messageStr);
+                        }
+                    });
+                }
+            } else if (data.type === 'addBlock') {
+                // Save block to database
+                if (currentRoom) {
+                    await saveBlock(currentRoom, {
+                        blockId: data.blockId,
+                        x: data.x,
+                        y: data.y,
+                        z: data.z,
+                        shape: data.shape,
+                        color: data.color
+                    });
+                }
+
+                // Broadcast to other clients
+                if (currentRoom && rooms.has(currentRoom)) {
+                    const roomClients = rooms.get(currentRoom);
+                    const messageStr = JSON.stringify(data);
+
+                    roomClients.forEach((client) => {
+                        if (client !== ws && client.readyState === WebSocket.OPEN) {
+                            client.send(messageStr);
+                        }
+                    });
+                }
+            } else if (data.type === 'removeBlock') {
+                // Remove block from database
+                if (currentRoom) {
+                    await removeBlock(currentRoom, data.blockId);
+                }
+
+                // Broadcast to other clients
                 if (currentRoom && rooms.has(currentRoom)) {
                     const roomClients = rooms.get(currentRoom);
                     const messageStr = JSON.stringify(data);
