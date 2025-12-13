@@ -293,6 +293,124 @@
             font-size: 0.9em;
             font-family: monospace;
         }
+
+        .existing-rooms {
+            margin-top: 15px;
+            padding: 15px;
+            background: #e7f0ff;
+            border-radius: 8px;
+            border: 1px solid #667eea;
+        }
+
+        .existing-rooms h4 {
+            margin: 0 0 10px 0;
+            color: #667eea;
+            font-size: 0.95em;
+        }
+
+        .room-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .room-tag {
+            padding: 8px 12px;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: all 0.2s;
+        }
+
+        .room-tag:hover {
+            background: #667eea;
+            color: white;
+            transform: scale(1.05);
+        }
+
+        .history-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+
+        .history-content {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            max-width: 90%;
+            max-height: 90%;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .history-content h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            padding: 8px 15px;
+            background: #ff4444;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .session-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .session-item {
+            padding: 15px;
+            background: #f8f9ff;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .session-item:hover {
+            border-color: #667eea;
+            background: #e7f0ff;
+        }
+
+        .session-item.selected {
+            border-color: #667eea;
+            background: #667eea;
+            color: white;
+        }
+
+        .preview-canvas-container {
+            margin-top: 20px;
+            border: 3px solid #667eea;
+            border-radius: 10px;
+            overflow: hidden;
+            background: white;
+        }
+
+        .preview-canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
     </style>
 </head>
 <body>
@@ -309,9 +427,25 @@
                 <small>You can change this if needed</small>
             </div>
 
+            <div class="existing-rooms" id="existingRoomsContainer" style="display: none;">
+                <h4>📂 Existing Rooms</h4>
+                <div class="room-tags" id="roomTags"></div>
+            </div>
+
             <input type="text" id="roomInput" placeholder="Enter room name (e.g., 'party')" style="margin-top: 15px;" />
             <button id="joinButton" style="margin-top: 10px;">Join Room</button>
             <div id="statusMessage" style="margin-top: 10px; font-size: 0.85em; color: #666;"></div>
+        </div>
+    </div>
+
+    <div class="history-modal hidden" id="historyModal">
+        <div class="history-content">
+            <button class="close-btn" id="closeHistory">✕ Close</button>
+            <h2>📚 Drawing History</h2>
+            <div class="session-list" id="sessionList"></div>
+            <div class="preview-canvas-container">
+                <canvas id="previewCanvas" class="preview-canvas" width="800" height="600"></canvas>
+            </div>
         </div>
     </div>
 
@@ -380,6 +514,7 @@
                 <div class="tool-section">
                     <button class="tool-btn clear-btn" id="clearBtn">🗑️ Clear Canvas</button>
                     <button class="tool-btn" id="saveBtn" style="margin-top: 10px; background: #28a745; color: white; border-color: #28a745;">💾 Save Drawing</button>
+                    <button class="tool-btn" id="historyBtn" style="margin-top: 10px; background: #6c757d; color: white; border-color: #6c757d;">📚 View History</button>
                 </div>
             </div>
         </div>
@@ -406,8 +541,128 @@
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+        const previewCanvas = document.getElementById('previewCanvas');
+        const previewCtx = previewCanvas.getContext('2d');
+
         function showStatus(msg) {
             document.getElementById('statusMessage').textContent = msg;
+        }
+
+        // Get API base URL from WebSocket URL
+        function getApiBaseUrl() {
+            const wsUrl = document.getElementById('serverUrl').value.trim();
+            // Convert wss://domain to https://domain or ws://domain to http://domain
+            return wsUrl.replace('wss://', 'https://').replace('ws://', 'http://');
+        }
+
+        // Load and display existing rooms
+        async function loadExistingRooms() {
+            try {
+                const apiUrl = getApiBaseUrl();
+                const response = await fetch(`${apiUrl}/api/rooms`);
+                const data = await response.json();
+
+                if (data.rooms && data.rooms.length > 0) {
+                    const container = document.getElementById('existingRoomsContainer');
+                    const tagsDiv = document.getElementById('roomTags');
+                    tagsDiv.innerHTML = '';
+
+                    data.rooms.forEach(room => {
+                        const tag = document.createElement('div');
+                        tag.className = 'room-tag';
+                        tag.textContent = room;
+                        tag.onclick = () => {
+                            document.getElementById('roomInput').value = room;
+                            document.getElementById('joinButton').click();
+                        };
+                        tagsDiv.appendChild(tag);
+                    });
+
+                    container.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error loading rooms:', error);
+            }
+        }
+
+        // Load drawing history for current room
+        async function loadHistory() {
+            if (!roomName) {
+                alert('Please join a room first!');
+                return;
+            }
+
+            try {
+                const apiUrl = getApiBaseUrl();
+                const response = await fetch(`${apiUrl}/api/rooms/${encodeURIComponent(roomName)}/sessions`);
+                const data = await response.json();
+
+                const sessionList = document.getElementById('sessionList');
+                sessionList.innerHTML = '';
+
+                if (data.sessions && data.sessions.length > 0) {
+                    data.sessions.forEach((sessionId, index) => {
+                        const sessionItem = document.createElement('div');
+                        sessionItem.className = 'session-item';
+                        const date = new Date(parseInt(sessionId));
+                        sessionItem.innerHTML = `
+                            <strong>Session ${data.sessions.length - index}</strong><br>
+                            <small>${date.toLocaleString()}</small>
+                        `;
+                        sessionItem.onclick = () => loadSessionPreview(sessionId);
+                        sessionList.appendChild(sessionItem);
+                    });
+
+                    // Load first session by default
+                    loadSessionPreview(data.sessions[0]);
+                } else {
+                    sessionList.innerHTML = '<p style="color: #666;">No previous sessions found</p>';
+                }
+
+                document.getElementById('historyModal').classList.remove('hidden');
+            } catch (error) {
+                console.error('Error loading history:', error);
+                alert('Error loading history');
+            }
+        }
+
+        // Load and preview a specific session
+        async function loadSessionPreview(sessionId) {
+            try {
+                const apiUrl = getApiBaseUrl();
+                const response = await fetch(`${apiUrl}/api/drawings/${encodeURIComponent(roomName)}/${encodeURIComponent(sessionId)}`);
+                const drawing = await response.json();
+
+                // Clear preview canvas
+                previewCtx.fillStyle = '#ffffff';
+                previewCtx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
+
+                // Draw strokes
+                if (drawing.strokes && drawing.strokes.length > 0) {
+                    drawing.strokes.forEach(stroke => {
+                        drawLineOnCanvas(previewCtx, stroke.x1, stroke.y1, stroke.x2, stroke.y2, stroke.color, stroke.size, stroke.tool);
+                    });
+                }
+
+                // Highlight selected session
+                document.querySelectorAll('.session-item').forEach(item => {
+                    item.classList.remove('selected');
+                });
+                event.target.closest('.session-item').classList.add('selected');
+            } catch (error) {
+                console.error('Error loading session preview:', error);
+            }
+        }
+
+        function drawLineOnCanvas(context, x1, y1, x2, y2, color, size, tool) {
+            context.beginPath();
+            context.moveTo(x1, y1);
+            context.lineTo(x2, y2);
+            context.strokeStyle = tool === 'erase' ? '#ffffff' : color;
+            context.lineWidth = size;
+            context.lineCap = 'round';
+            context.lineJoin = 'round';
+            context.stroke();
         }
 
         function updateConnectionStatus(connected, peers = 0, reconnecting = false) {
@@ -651,6 +906,17 @@
                 URL.revokeObjectURL(url);
             }, 'image/png');
         });
+
+        document.getElementById('historyBtn').addEventListener('click', () => {
+            loadHistory();
+        });
+
+        document.getElementById('closeHistory').addEventListener('click', () => {
+            document.getElementById('historyModal').classList.add('hidden');
+        });
+
+        // Load existing rooms on page load
+        loadExistingRooms();
     </script>
 </body>
 </html>

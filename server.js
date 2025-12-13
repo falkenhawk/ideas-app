@@ -11,8 +11,47 @@ if (!fs.existsSync(DRAWINGS_DIR)) {
     fs.mkdirSync(DRAWINGS_DIR, { recursive: true });
 }
 
-// Create HTTP server that serves static files
+// Create HTTP server that serves static files and API
 const server = http.createServer((req, res) => {
+    // API endpoints
+    if (req.url.startsWith('/api/')) {
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+
+        if (req.url === '/api/rooms' && req.method === 'GET') {
+            // List all rooms
+            const rooms = listAllRooms();
+            res.writeHead(200);
+            res.end(JSON.stringify({ rooms }));
+            return;
+        }
+
+        const sessionsMatch = req.url.match(/^\/api\/rooms\/([^\/]+)\/sessions$/);
+        if (sessionsMatch && req.method === 'GET') {
+            // List sessions for a room
+            const roomName = decodeURIComponent(sessionsMatch[1]);
+            const sessions = listRoomSessions(roomName);
+            res.writeHead(200);
+            res.end(JSON.stringify({ sessions }));
+            return;
+        }
+
+        const drawingMatch = req.url.match(/^\/api\/drawings\/([^\/]+)\/([^\/]+)$/);
+        if (drawingMatch && req.method === 'GET') {
+            // Get a specific drawing
+            const roomName = decodeURIComponent(drawingMatch[1]);
+            const sessionId = decodeURIComponent(drawingMatch[2]);
+            const drawing = loadRoomDrawing(roomName, sessionId);
+            res.writeHead(200);
+            res.end(JSON.stringify(drawing));
+            return;
+        }
+
+        res.writeHead(404);
+        res.end(JSON.stringify({ error: 'Not found' }));
+        return;
+    }
+
     // Serve static files
     let filePath = '.' + req.url;
     if (filePath === './') {
@@ -50,14 +89,78 @@ const wss = new WebSocket.Server({ server });
 // Store rooms: roomName -> Set of WebSocket connections
 const rooms = new Map();
 
+// Store current session for each room: roomName -> sessionId (timestamp)
+const currentSessions = new Map();
+
 // Helper functions for persistence
-function getRoomFilePath(roomName) {
-    const safeName = roomName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    return path.join(DRAWINGS_DIR, `${safeName}.json`);
+function getSafeRoomName(roomName) {
+    return roomName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
 }
 
-function loadRoomDrawing(roomName) {
-    const filePath = getRoomFilePath(roomName);
+function getSessionFileName(roomName, sessionId) {
+    const safeName = getSafeRoomName(roomName);
+    return `${safeName}_${sessionId}.json`;
+}
+
+function getRoomFilePath(roomName, sessionId) {
+    return path.join(DRAWINGS_DIR, getSessionFileName(roomName, sessionId));
+}
+
+function getCurrentSessionId(roomName) {
+    if (!currentSessions.has(roomName)) {
+        // Check if there are existing sessions for this room
+        const sessions = listRoomSessions(roomName);
+        if (sessions.length > 0) {
+            // Use the most recent session
+            currentSessions.set(roomName, sessions[0]);
+        } else {
+            // Create new session
+            currentSessions.set(roomName, Date.now().toString());
+        }
+    }
+    return currentSessions.get(roomName);
+}
+
+function listRoomSessions(roomName) {
+    const safeName = getSafeRoomName(roomName);
+    const prefix = `${safeName}_`;
+
+    try {
+        const files = fs.readdirSync(DRAWINGS_DIR);
+        const sessions = files
+            .filter(f => f.startsWith(prefix) && f.endsWith('.json'))
+            .map(f => f.replace(prefix, '').replace('.json', ''))
+            .sort((a, b) => parseInt(b) - parseInt(a)); // newest first
+        return sessions;
+    } catch (error) {
+        return [];
+    }
+}
+
+function listAllRooms() {
+    try {
+        const files = fs.readdirSync(DRAWINGS_DIR);
+        const rooms = new Set();
+
+        files.forEach(f => {
+            if (f.endsWith('.json')) {
+                // Extract room name from filename (before last underscore)
+                const lastUnderscore = f.lastIndexOf('_');
+                if (lastUnderscore > 0) {
+                    rooms.add(f.substring(0, lastUnderscore));
+                }
+            }
+        });
+
+        return Array.from(rooms);
+    } catch (error) {
+        return [];
+    }
+}
+
+function loadRoomDrawing(roomName, sessionId = null) {
+    const actualSessionId = sessionId || getCurrentSessionId(roomName);
+    const filePath = getRoomFilePath(roomName, actualSessionId);
     try {
         if (fs.existsSync(filePath)) {
             const data = fs.readFileSync(filePath, 'utf8');
@@ -70,9 +173,10 @@ function loadRoomDrawing(roomName) {
 }
 
 function saveStroke(roomName, stroke) {
-    const filePath = getRoomFilePath(roomName);
+    const sessionId = getCurrentSessionId(roomName);
+    const filePath = getRoomFilePath(roomName, sessionId);
     try {
-        const drawing = loadRoomDrawing(roomName);
+        const drawing = loadRoomDrawing(roomName, sessionId);
         drawing.strokes.push(stroke);
         fs.writeFileSync(filePath, JSON.stringify(drawing, null, 2));
     } catch (error) {
@@ -80,13 +184,16 @@ function saveStroke(roomName, stroke) {
     }
 }
 
-function clearRoomDrawing(roomName) {
-    const filePath = getRoomFilePath(roomName);
+function createNewSession(roomName) {
+    const newSessionId = Date.now().toString();
+    currentSessions.set(roomName, newSessionId);
+    const filePath = getRoomFilePath(roomName, newSessionId);
     try {
         fs.writeFileSync(filePath, JSON.stringify({ strokes: [] }, null, 2));
     } catch (error) {
-        console.error('Error clearing room drawing:', error);
+        console.error('Error creating new session:', error);
     }
+    return newSessionId;
 }
 
 wss.on('connection', (ws) => {
@@ -145,9 +252,10 @@ wss.on('connection', (ws) => {
                     });
                 }
             } else if (data.type === 'clear') {
-                // Clear saved drawing
+                // Create new session instead of clearing
                 if (currentRoom) {
-                    clearRoomDrawing(currentRoom);
+                    const newSessionId = createNewSession(currentRoom);
+                    console.log(`Created new session for room ${currentRoom}: ${newSessionId}`);
                 }
 
                 // Broadcast clear to other clients
