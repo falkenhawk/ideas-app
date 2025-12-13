@@ -82,6 +82,75 @@
             border-radius: 10px;
             overflow: hidden;
             background: white;
+            position: relative;
+        }
+
+        .canvas-header {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            color: #667eea;
+            font-weight: 500;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .canvas-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 8px;
+            z-index: 10;
+        }
+
+        .canvas-control-btn {
+            width: 40px;
+            height: 40px;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            font-size: 1.2em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .canvas-control-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .canvas-control-btn:not(:disabled):hover {
+            background: #667eea;
+            transform: scale(1.1);
+        }
+
+        .canvas-control-btn:not(:disabled):hover {
+            filter: brightness(1.1);
+        }
+
+        .replay-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            color: white;
+            font-size: 1.2em;
+            font-weight: 600;
         }
 
         canvas {
@@ -398,6 +467,27 @@
             color: white;
         }
 
+        .session-replay-btn {
+            margin-top: 8px;
+            padding: 6px 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: all 0.2s;
+        }
+
+        .session-item.selected .session-replay-btn {
+            background: white;
+            color: #667eea;
+        }
+
+        .session-replay-btn:hover {
+            transform: scale(1.05);
+        }
+
         .preview-canvas-container {
             margin-top: 20px;
             border: 3px solid #667eea;
@@ -467,6 +557,12 @@
 
         <div class="main-content">
             <div class="canvas-container">
+                <div class="canvas-header">✨ Draw something!</div>
+                <div class="canvas-controls">
+                    <button class="canvas-control-btn" id="undoBtn" title="Undo" disabled>↶</button>
+                    <button class="canvas-control-btn" id="redoBtn" title="Redo" disabled>↷</button>
+                    <button class="canvas-control-btn" id="replayBtn" title="Replay Session">▶</button>
+                </div>
                 <canvas id="drawingCanvas" width="800" height="600"></canvas>
             </div>
 
@@ -543,6 +639,17 @@
         let reconnectTimeout = null;
         let isIntentionalDisconnect = false;
 
+        // Undo/Redo state (only for own strokes)
+        let ownStrokes = [];
+        let undoPosition = 0;
+
+        // Replay state
+        let isReplaying = false;
+        let replayQueue = [];
+
+        // All strokes for current session (from server + own)
+        let allSessionStrokes = [];
+
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -614,12 +721,37 @@
                         sessionItem.className = 'session-item';
                         const date = new Date(parseInt(sessionId));
                         sessionItem.innerHTML = `
-                            <strong>Session ${data.sessions.length - index}</strong><br>
-                            <small>${date.toLocaleString()}</small>
+                            <div>
+                                <strong>Session ${data.sessions.length - index}</strong><br>
+                                <small>${date.toLocaleString()}</small>
+                            </div>
+                            <button class="session-replay-btn" onclick="event.stopPropagation();">▶ Replay</button>
                         `;
-                        sessionItem.onclick = function() {
-                            loadSessionPreview(sessionId, this);
+
+                        // Click on item to preview
+                        sessionItem.onclick = function(e) {
+                            if (!e.target.classList.contains('session-replay-btn')) {
+                                loadSessionPreview(sessionId, this);
+                            }
                         };
+
+                        // Replay button
+                        const replayBtn = sessionItem.querySelector('.session-replay-btn');
+                        replayBtn.onclick = async function(e) {
+                            e.stopPropagation();
+                            this.disabled = true;
+                            this.textContent = 'Replaying...';
+
+                            const apiUrl = getApiBaseUrl();
+                            const response = await fetch(`${apiUrl}/api/drawings/${encodeURIComponent(roomName)}/${encodeURIComponent(sessionId)}`);
+                            const drawing = await response.json();
+
+                            await replaySessionPreview(drawing.strokes, previewCtx, previewCanvas);
+
+                            this.disabled = false;
+                            this.textContent = '▶ Replay';
+                        };
+
                         sessionList.appendChild(sessionItem);
                     });
 
@@ -676,6 +808,113 @@
             context.lineCap = 'round';
             context.lineJoin = 'round';
             context.stroke();
+        }
+
+        // Update undo/redo button states
+        function updateUndoRedoButtons() {
+            document.getElementById('undoBtn').disabled = undoPosition === 0;
+            document.getElementById('redoBtn').disabled = undoPosition === ownStrokes.length;
+        }
+
+        // Undo last stroke
+        function undo() {
+            if (undoPosition > 0) {
+                undoPosition--;
+                redrawCanvas();
+                updateUndoRedoButtons();
+            }
+        }
+
+        // Redo stroke
+        function redo() {
+            if (undoPosition < ownStrokes.length) {
+                undoPosition++;
+                redrawCanvas();
+                updateUndoRedoButtons();
+            }
+        }
+
+        // Redraw canvas from all strokes
+        function redrawCanvas() {
+            // Clear canvas
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw all session strokes from server
+            allSessionStrokes.forEach(stroke => {
+                drawLine(stroke.x1, stroke.y1, stroke.x2, stroke.y2, stroke.color, stroke.size, stroke.tool);
+            });
+
+            // Draw own strokes up to undo position
+            for (let i = 0; i < undoPosition; i++) {
+                const stroke = ownStrokes[i];
+                drawLine(stroke.x1, stroke.y1, stroke.x2, stroke.y2, stroke.color, stroke.size, stroke.tool);
+            }
+        }
+
+        // Replay session animation
+        async function replaySession() {
+            if (isReplaying || allSessionStrokes.length === 0) return;
+
+            isReplaying = true;
+            document.getElementById('replayBtn').disabled = true;
+
+            // Show replay overlay
+            const overlay = document.createElement('div');
+            overlay.className = 'replay-overlay';
+            overlay.textContent = 'Replaying...';
+            document.querySelector('.canvas-container').appendChild(overlay);
+
+            // Clear canvas
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Get combined strokes (server + own visible strokes)
+            const replayStrokes = [
+                ...allSessionStrokes,
+                ...ownStrokes.slice(0, undoPosition)
+            ];
+
+            // Replay at 5 strokes per second (200ms per stroke)
+            for (let i = 0; i < replayStrokes.length; i++) {
+                const stroke = replayStrokes[i];
+                drawLine(stroke.x1, stroke.y1, stroke.x2, stroke.y2, stroke.color, stroke.size, stroke.tool);
+                await new Promise(resolve => setTimeout(resolve, 200));
+
+                // Process any queued strokes from other users
+                while (replayQueue.length > 0) {
+                    const queuedStroke = replayQueue.shift();
+                    allSessionStrokes.push(queuedStroke);
+                }
+            }
+
+            // Remove overlay
+            overlay.remove();
+            isReplaying = false;
+            document.getElementById('replayBtn').disabled = false;
+
+            // Process any remaining queued strokes
+            while (replayQueue.length > 0) {
+                const queuedStroke = replayQueue.shift();
+                allSessionStrokes.push(queuedStroke);
+                drawLine(queuedStroke.x1, queuedStroke.y1, queuedStroke.x2, queuedStroke.y2,
+                         queuedStroke.color, queuedStroke.size, queuedStroke.tool);
+            }
+        }
+
+        // Replay session in preview canvas (for history)
+        async function replaySessionPreview(strokes, previewContext, previewCanvasElem) {
+            // Clear preview canvas
+            previewContext.fillStyle = '#ffffff';
+            previewContext.fillRect(0, 0, previewCanvasElem.width, previewCanvasElem.height);
+
+            // Replay at 5 strokes per second
+            for (let i = 0; i < strokes.length; i++) {
+                const stroke = strokes[i];
+                drawLineOnCanvas(previewContext, stroke.x1, stroke.y1, stroke.x2, stroke.y2,
+                                stroke.color, stroke.size, stroke.tool);
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
         }
 
         function updateConnectionStatus(connected, peers = 0, reconnecting = false) {
@@ -743,15 +982,44 @@
                     peerCount = data.peers;
                     updateConnectionStatus(true, peerCount);
 
-                    // Replay previous strokes if any
+                    // Reset undo/redo state for new room
+                    ownStrokes = [];
+                    undoPosition = 0;
+                    updateUndoRedoButtons();
+
+                    // Load previous strokes from server
                     if (data.strokes && data.strokes.length > 0) {
+                        allSessionStrokes = [...data.strokes];
                         replayStrokes(data.strokes);
+                    } else {
+                        allSessionStrokes = [];
                     }
 
                     document.getElementById('introOverlay').classList.add('hidden');
                 } else if (data.type === 'stroke') {
-                    drawLine(data.x1, data.y1, data.x2, data.y2, data.color, data.size, data.tool);
+                    const stroke = {
+                        x1: data.x1, y1: data.y1,
+                        x2: data.x2, y2: data.y2,
+                        color: data.color,
+                        size: data.size,
+                        tool: data.tool
+                    };
+
+                    if (isReplaying) {
+                        // Queue strokes received during replay
+                        replayQueue.push(stroke);
+                    } else {
+                        // Add to session strokes and draw immediately
+                        allSessionStrokes.push(stroke);
+                        drawLine(stroke.x1, stroke.y1, stroke.x2, stroke.y2, stroke.color, stroke.size, stroke.tool);
+                    }
                 } else if (data.type === 'clear') {
+                    // Clear all strokes and reset undo/redo
+                    allSessionStrokes = [];
+                    ownStrokes = [];
+                    undoPosition = 0;
+                    updateUndoRedoButtons();
+
                     ctx.fillStyle = '#ffffff';
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
                 }
@@ -829,6 +1097,7 @@
         }
 
         function startDrawing(e) {
+            if (isReplaying) return; // Disable drawing during replay
             e.preventDefault();
             isDrawing = true;
             const coords = getCanvasCoords(e);
@@ -837,14 +1106,11 @@
         }
 
         function draw(e) {
-            if (!isDrawing) return;
+            if (!isDrawing || isReplaying) return; // Disable drawing during replay
             e.preventDefault();
             const coords = getCanvasCoords(e);
 
-            drawLine(lastX, lastY, coords.x, coords.y, currentColor, currentSize, currentTool);
-
-            send({
-                type: 'stroke',
+            const stroke = {
                 x1: lastX,
                 y1: lastY,
                 x2: coords.x,
@@ -852,6 +1118,30 @@
                 color: currentColor,
                 size: currentSize,
                 tool: currentTool
+            };
+
+            // Draw on canvas
+            drawLine(stroke.x1, stroke.y1, stroke.x2, stroke.y2, stroke.color, stroke.size, stroke.tool);
+
+            // Add to own strokes and handle undo/redo
+            if (undoPosition < ownStrokes.length) {
+                // Clear redo history when drawing after undo
+                ownStrokes = ownStrokes.slice(0, undoPosition);
+            }
+            ownStrokes.push(stroke);
+            undoPosition = ownStrokes.length;
+            updateUndoRedoButtons();
+
+            // Send to server
+            send({
+                type: 'stroke',
+                x1: stroke.x1,
+                y1: stroke.y1,
+                x2: stroke.x2,
+                y2: stroke.y2,
+                color: stroke.color,
+                size: stroke.size,
+                tool: stroke.tool
             });
 
             lastX = coords.x;
@@ -934,6 +1224,19 @@
             if (e.target.id === 'historyModal') {
                 document.getElementById('historyModal').classList.add('hidden');
             }
+        });
+
+        // Undo/Redo/Replay buttons
+        document.getElementById('undoBtn').addEventListener('click', () => {
+            undo();
+        });
+
+        document.getElementById('redoBtn').addEventListener('click', () => {
+            redo();
+        });
+
+        document.getElementById('replayBtn').addEventListener('click', () => {
+            replaySession();
         });
 
         // Exit room button
