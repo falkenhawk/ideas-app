@@ -626,9 +626,10 @@
         let isIntentionalDisconnect = false;
 
         // Stroke tracking with indices
-        let allStrokes = []; // All strokes with indices (stroke_index, x1, y1, x2, y2, color, size, tool, deleted)
+        let allStrokes = []; // All strokes with indices (stroke_index, x1, y1, x2, y2, color, size, tool)
         let nextStrokeIndex = 0;
         let deletedIndices = new Set(); // Track which indices are deleted (for undo/redo)
+        let ownStrokeIndices = []; // Track only OWN stroke indices (for undo/redo) - in order drawn
 
         // Long press state
         let undoLongPressTimer = null;
@@ -798,28 +799,34 @@
 
         // Update undo/redo button states
         function updateUndoRedoButtons() {
-            // Find last non-deleted stroke
+            // Find last non-deleted OWN stroke
             let hasUndoable = false;
-            for (let i = allStrokes.length - 1; i >= 0; i--) {
-                if (!deletedIndices.has(allStrokes[i].stroke_index)) {
+            for (let i = ownStrokeIndices.length - 1; i >= 0; i--) {
+                if (!deletedIndices.has(ownStrokeIndices[i])) {
                     hasUndoable = true;
                     break;
                 }
             }
 
-            // Check if there are deleted strokes to redo
-            const hasRedoable = deletedIndices.size > 0;
+            // Check if there are deleted OWN strokes to redo
+            let hasRedoable = false;
+            for (let i = 0; i < ownStrokeIndices.length; i++) {
+                if (deletedIndices.has(ownStrokeIndices[i])) {
+                    hasRedoable = true;
+                    break;
+                }
+            }
 
             document.getElementById('undoBtn').disabled = !hasUndoable;
             document.getElementById('redoBtn').disabled = !hasRedoable;
         }
 
-        // Undo last non-deleted stroke
+        // Undo last non-deleted OWN stroke
         function undo() {
-            // Find last non-deleted stroke
-            for (let i = allStrokes.length - 1; i >= 0; i--) {
-                if (!deletedIndices.has(allStrokes[i].stroke_index)) {
-                    const strokeIndex = allStrokes[i].stroke_index;
+            // Find last non-deleted OWN stroke (from end of ownStrokeIndices)
+            for (let i = ownStrokeIndices.length - 1; i >= 0; i--) {
+                const strokeIndex = ownStrokeIndices[i];
+                if (!deletedIndices.has(strokeIndex)) {
                     deletedIndices.add(strokeIndex);
 
                     // Send undo to server
@@ -835,31 +842,24 @@
             }
         }
 
-        // Redo last deleted stroke
+        // Redo most recently deleted OWN stroke
         function redo() {
-            // Find most recently deleted stroke
-            let maxDeletedIndex = -1;
-            let maxDeletedStrokeIdx = -1;
+            // Find most recently deleted OWN stroke (from end of ownStrokeIndices)
+            for (let i = ownStrokeIndices.length - 1; i >= 0; i--) {
+                const strokeIndex = ownStrokeIndices[i];
+                if (deletedIndices.has(strokeIndex)) {
+                    deletedIndices.delete(strokeIndex);
 
-            for (let i = allStrokes.length - 1; i >= 0; i--) {
-                const strokeIndex = allStrokes[i].stroke_index;
-                if (deletedIndices.has(strokeIndex) && strokeIndex > maxDeletedIndex) {
-                    maxDeletedIndex = strokeIndex;
-                    maxDeletedStrokeIdx = strokeIndex;
+                    // Send redo to server
+                    send({
+                        type: 'redo',
+                        strokeIndex: strokeIndex
+                    });
+
+                    redrawCanvas();
+                    updateUndoRedoButtons();
+                    return;
                 }
-            }
-
-            if (maxDeletedStrokeIdx !== -1) {
-                deletedIndices.delete(maxDeletedStrokeIdx);
-
-                // Send redo to server
-                send({
-                    type: 'redo',
-                    strokeIndex: maxDeletedStrokeIdx
-                });
-
-                redrawCanvas();
-                updateUndoRedoButtons();
             }
         }
 
@@ -957,9 +957,10 @@
                     peerCount = data.peers;
                     updateConnectionStatus(true, peerCount);
 
-                    // Reset state for new room
+                    // Reset state for new room - IMPORTANT: Clear own stroke history on join/rejoin
                     allStrokes = [];
                     deletedIndices.clear();
+                    ownStrokeIndices = []; // Clear own strokes - fresh start in this session
                     nextStrokeIndex = 0;
 
                     // Load previous strokes from server
@@ -976,7 +977,7 @@
                         replayStrokes(allStrokes);
                     }
 
-                    updateUndoRedoButtons();
+                    updateUndoRedoButtons(); // Will disable buttons since ownStrokeIndices is empty
                     document.getElementById('introOverlay').classList.add('hidden');
 
                 } else if (data.type === 'stroke') {
@@ -1008,9 +1009,10 @@
                     updateUndoRedoButtons();
 
                 } else if (data.type === 'clear') {
-                    // Clear all strokes
+                    // Clear all strokes and own stroke history
                     allStrokes = [];
                     deletedIndices.clear();
+                    ownStrokeIndices = []; // Clear own strokes on clear
                     nextStrokeIndex = 0;
                     updateUndoRedoButtons();
 
@@ -1122,12 +1124,22 @@
             // Add to strokes array
             allStrokes.push(stroke);
 
-            // Clear redo when drawing (remove any deleted indices that are higher than current)
-            deletedIndices.forEach(idx => {
-                if (idx >= strokeIndex) {
-                    deletedIndices.delete(idx);
+            // Add to OWN strokes for undo/redo
+            ownStrokeIndices.push(strokeIndex);
+
+            // When drawing new stroke, clear redo for any of YOUR deleted strokes after this point
+            // Keep track of which own strokes to remove from ownStrokeIndices
+            const newOwnIndices = [];
+            for (let i = 0; i < ownStrokeIndices.length - 1; i++) { // -1 to exclude the one we just added
+                const idx = ownStrokeIndices[i];
+                if (!deletedIndices.has(idx)) {
+                    newOwnIndices.push(idx);
+                } else {
+                    deletedIndices.delete(idx); // Remove from deleted
                 }
-            });
+            }
+            newOwnIndices.push(strokeIndex); // Add current stroke
+            ownStrokeIndices = newOwnIndices;
 
             updateUndoRedoButtons();
 
@@ -1230,13 +1242,23 @@
         const undoBtn = document.getElementById('undoBtn');
         const redoBtn = document.getElementById('redoBtn');
 
-        function startUndoLongPress() {
+        function startUndoLongPress(e) {
+            if (undoBtn.disabled) return; // Don't start if button is disabled
+
+            e.preventDefault(); // Prevent default to avoid triggering twice
             undo(); // Immediate undo on press
+
+            // Clear any existing timers
+            stopUndoLongPress();
 
             // Start long press after 300ms
             undoLongPressTimer = setTimeout(() => {
-                // Then undo every 20ms
+                // Then undo every 20ms while button is not disabled
                 undoLongPressInterval = setInterval(() => {
+                    if (undoBtn.disabled) {
+                        stopUndoLongPress();
+                        return;
+                    }
                     undo();
                 }, 20);
             }, 300);
@@ -1253,13 +1275,23 @@
             }
         }
 
-        function startRedoLongPress() {
+        function startRedoLongPress(e) {
+            if (redoBtn.disabled) return; // Don't start if button is disabled
+
+            e.preventDefault(); // Prevent default to avoid triggering twice
             redo(); // Immediate redo on press
+
+            // Clear any existing timers
+            stopRedoLongPress();
 
             // Start long press after 300ms
             redoLongPressTimer = setTimeout(() => {
-                // Then redo every 20ms
+                // Then redo every 20ms while button is not disabled
                 redoLongPressInterval = setInterval(() => {
+                    if (redoBtn.disabled) {
+                        stopRedoLongPress();
+                        return;
+                    }
                     redo();
                 }, 20);
             }, 300);
@@ -1280,21 +1312,17 @@
         undoBtn.addEventListener('mousedown', startUndoLongPress);
         undoBtn.addEventListener('mouseup', stopUndoLongPress);
         undoBtn.addEventListener('mouseleave', stopUndoLongPress);
-        undoBtn.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            startUndoLongPress();
-        });
+        undoBtn.addEventListener('touchstart', startUndoLongPress);
         undoBtn.addEventListener('touchend', stopUndoLongPress);
+        undoBtn.addEventListener('touchcancel', stopUndoLongPress);
 
         // Redo button events
         redoBtn.addEventListener('mousedown', startRedoLongPress);
         redoBtn.addEventListener('mouseup', stopRedoLongPress);
         redoBtn.addEventListener('mouseleave', stopRedoLongPress);
-        redoBtn.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            startRedoLongPress();
-        });
+        redoBtn.addEventListener('touchstart', startRedoLongPress);
         redoBtn.addEventListener('touchend', stopRedoLongPress);
+        redoBtn.addEventListener('touchcancel', stopRedoLongPress);
 
         // Exit room button
         document.getElementById('exitRoomBtn').addEventListener('click', () => {
