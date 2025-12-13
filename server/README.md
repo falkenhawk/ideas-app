@@ -30,4 +30,6 @@ Server runs on http://localhost:8080
 
 - Clients connect and join rooms by name
 - Server relays drawing strokes between clients in the same room
-- No drawing data is stored - pure relay
+- Drawing data is persisted to disk per room (in `drawings/` directory)
+- When joining a room, clients receive all previous strokes and can continue drawing
+- Drawings are automatically saved as clients draw

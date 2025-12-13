@@ -43,6 +43,13 @@
 
         .header h1 {
             font-size: 1.5em;
+            margin-bottom: 5px;
+        }
+
+        .header .subtitle {
+            font-size: 0.9em;
+            opacity: 0.9;
+            font-weight: 300;
         }
 
         .connection-status {
@@ -292,6 +299,7 @@
     <div class="intro-overlay" id="introOverlay">
         <div class="intro-card">
             <h2>🎨 Collaborative Drawing</h2>
+            <p style="color: #667eea; font-style: italic; margin-bottom: 10px;">ovos xmas vibe coding party</p>
             <p><strong>Draw together in real-time!</strong></p>
 
             <div class="server-url">
@@ -309,7 +317,10 @@
 
     <div class="container">
         <div class="header">
-            <h1>🎨 Collaborative Drawing</h1>
+            <div>
+                <h1>🎨 Collaborative Drawing</h1>
+                <div class="subtitle">ovos xmas vibe coding party</div>
+            </div>
             <div class="connection-status">
                 <div class="status-indicator" id="statusIndicator"></div>
                 <span id="statusText">Not connected</span>
@@ -463,6 +474,12 @@
                     showStatus('');
                     peerCount = data.peers;
                     updateConnectionStatus(true, peerCount);
+
+                    // Replay previous strokes if any
+                    if (data.strokes && data.strokes.length > 0) {
+                        replayStrokes(data.strokes);
+                    }
+
                     document.getElementById('introOverlay').classList.add('hidden');
                 } else if (data.type === 'stroke') {
                     drawLine(data.x1, data.y1, data.x2, data.y2, data.color, data.size, data.tool);
@@ -517,6 +534,19 @@
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             ctx.stroke();
+        }
+
+        function replayStrokes(strokes) {
+            if (!strokes || !Array.isArray(strokes)) return;
+
+            // Clear canvas first
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Replay all strokes
+            strokes.forEach(stroke => {
+                drawLine(stroke.x1, stroke.y1, stroke.x2, stroke.y2, stroke.color, stroke.size, stroke.tool);
+            });
         }
 
         function getCanvasCoords(e) {
