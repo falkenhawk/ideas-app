@@ -550,6 +550,11 @@
                 // Delete mode
                 if (intersect.object.userData.blockId) {
                     const blockId = intersect.object.userData.blockId;
+
+                    // Remove block locally immediately (optimistic update)
+                    removeBlock(blockId);
+
+                    // Send to server for persistence and broadcast to others
                     send({
                         type: 'removeBlock',
                         blockId: blockId
@@ -592,6 +597,11 @@
                     }
 
                     const blockId = `${Date.now()}_${Math.random()}`;
+
+                    // Create block locally immediately (optimistic update)
+                    createBlock(blockId, position.x, position.y, position.z, currentShape, currentColor);
+
+                    // Send to server for persistence and broadcast to others
                     send({
                         type: 'addBlock',
                         blockId: blockId,
