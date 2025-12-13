@@ -52,7 +52,7 @@
             border: none;
             border-radius: 12px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-            z-index: 99;
+            z-index: 101;
             cursor: pointer;
             font-size: 24px;
             display: none;
@@ -65,7 +65,7 @@
             transform: scale(0.95);
         }
 
-        #toolbar.collapsed ~ #toolbar-toggle {
+        #toolbar-toggle.show {
             display: flex;
         }
 
@@ -163,15 +163,17 @@
         #status {
             position: absolute;
             top: 20px;
-            right: 20px;
+            left: 50%;
+            transform: translateX(-50%);
             background: rgba(255, 255, 255, 0.95);
-            padding: 12px 20px;
+            padding: 10px 16px;
             border-radius: 8px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
             z-index: 100;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
+            font-size: 14px;
         }
 
         .status-dot {
@@ -461,42 +463,70 @@
         // UI Helper functions
         window.toggleToolbar = function() {
             const toolbar = document.getElementById('toolbar');
+            const toggleBtn = document.getElementById('toolbar-toggle');
+
             toolbar.classList.toggle('collapsed');
+
+            // Show toggle button when toolbar is collapsed
+            if (toolbar.classList.contains('collapsed')) {
+                toggleBtn.classList.add('show');
+            } else {
+                toggleBtn.classList.remove('show');
+            }
         };
 
         window.placeBlockAtCenter = function() {
-            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+            console.log('placeBlockAtCenter called');
+            console.log('WebSocket state:', ws ? ws.readyState : 'no ws');
+            console.log('Mode:', currentMode, 'Shape:', currentShape, 'Color:', currentColor);
+
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                console.log('WebSocket not connected!');
+                return;
+            }
 
             // Raycast from center of screen
             raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
             const intersects = raycaster.intersectObjects(scene.children, true);
 
+            console.log('Intersects found:', intersects.length);
+
             if (intersects.length > 0) {
                 const intersect = intersects[0];
+                console.log('First intersect:', intersect.object.userData);
 
                 if (currentMode === 'delete') {
                     // Delete mode: remove the block at center
                     if (intersect.object.userData.blockId) {
                         const blockId = intersect.object.userData.blockId;
+                        console.log('Deleting block:', blockId);
                         send({
                             type: 'removeBlock',
                             blockId: blockId
                         });
+                    } else {
+                        console.log('No blockId on intersected object');
                     }
                 } else {
                     // Build mode: place a new block
-                    let position = new THREE.Vector3();
+                    let position = null;
 
                     if (intersect.object.userData.isGround) {
                         // Clicking on ground
+                        console.log('Placing on ground');
+                        position = new THREE.Vector3();
                         position.copy(intersect.point);
                         position.y = BLOCK_SIZE / 2;
                     } else if (intersect.object.userData.blockId) {
                         // Clicking on existing block
+                        console.log('Placing adjacent to block');
+                        position = new THREE.Vector3();
                         position.copy(intersect.point);
                         position.add(intersect.face.normal);
                         position.divideScalar(BLOCK_SIZE).floor().multiplyScalar(BLOCK_SIZE);
                         position.addScalar(BLOCK_SIZE / 2);
+                    } else {
+                        console.log('Intersected with unknown object:', intersect.object.type);
                     }
 
                     if (position) {
@@ -505,12 +535,15 @@
                         position.y = Math.max(BLOCK_SIZE / 2, Math.round(position.y));
                         position.z = Math.round(position.z);
 
+                        console.log('Placing block at:', position);
+
                         // Check bounds
                         if (Math.abs(position.x) <= GRID_SIZE / 2 &&
                             Math.abs(position.z) <= GRID_SIZE / 2 &&
                             position.y > 0) {
 
                             const blockId = `${Date.now()}_${Math.random()}`;
+                            console.log('Sending addBlock message:', blockId);
                             send({
                                 type: 'addBlock',
                                 blockId: blockId,
@@ -520,9 +553,13 @@
                                 shape: currentShape,
                                 color: currentColor
                             });
+                        } else {
+                            console.log('Position out of bounds:', position);
                         }
                     }
                 }
+            } else {
+                console.log('No intersections found! Camera position:', camera.position);
             }
         };
 
