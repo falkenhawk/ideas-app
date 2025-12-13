@@ -475,6 +475,7 @@
                     <h3>Room</h3>
                     <input type="text" id="roomName" readonly />
                     <div class="peers-list" id="peersList">Not connected</div>
+                    <button class="tool-btn" id="exitRoomBtn" style="margin-top: 10px; background: #ff8800; color: white; border-color: #ff8800;">🚪 Exit Room</button>
                 </div>
 
                 <div class="tool-section">
@@ -932,6 +933,42 @@
         document.getElementById('historyModal').addEventListener('click', (e) => {
             if (e.target.id === 'historyModal') {
                 document.getElementById('historyModal').classList.add('hidden');
+            }
+        });
+
+        // Exit room button
+        document.getElementById('exitRoomBtn').addEventListener('click', () => {
+            // Set flag to prevent auto-reconnect
+            isIntentionalDisconnect = true;
+
+            // Close WebSocket connection
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close();
+            }
+
+            // Clear reconnect timeout if any
+            if (reconnectTimeout) {
+                clearTimeout(reconnectTimeout);
+                reconnectTimeout = null;
+            }
+
+            // Reset state
+            roomName = '';
+            reconnectAttempts = 0;
+            document.getElementById('roomName').value = '';
+            document.getElementById('roomInput').value = '';
+
+            // Update status
+            updateConnectionStatus(false);
+
+            // Show intro overlay
+            document.getElementById('introOverlay').classList.remove('hidden');
+
+            // Reload existing rooms
+            try {
+                loadExistingRooms();
+            } catch (error) {
+                console.error('Error loading rooms:', error);
             }
         });
 
