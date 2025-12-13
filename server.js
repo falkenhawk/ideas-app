@@ -31,6 +31,7 @@ if (DATABASE_URL) {
 
 async function initDatabase() {
     try {
+        // Create table with basic structure
         await pool.query(`
             CREATE TABLE IF NOT EXISTS strokes (
                 id SERIAL PRIMARY KEY,
@@ -47,11 +48,49 @@ async function initDatabase() {
             )
         `);
 
+        // Add stroke_index column if it doesn't exist (migration)
+        try {
+            await pool.query(`
+                ALTER TABLE strokes ADD COLUMN IF NOT EXISTS stroke_index INTEGER
+            `);
+
+            // Set stroke_index for existing rows (use id as fallback)
+            await pool.query(`
+                UPDATE strokes SET stroke_index = id WHERE stroke_index IS NULL
+            `);
+
+            // Make stroke_index NOT NULL after setting values
+            await pool.query(`
+                ALTER TABLE strokes ALTER COLUMN stroke_index SET NOT NULL
+            `);
+        } catch (error) {
+            console.log('stroke_index migration completed or not needed');
+        }
+
+        // Add deleted column if it doesn't exist (migration)
+        try {
+            await pool.query(`
+                ALTER TABLE strokes ADD COLUMN IF NOT EXISTS deleted BOOLEAN DEFAULT FALSE
+            `);
+
+            // Set deleted = FALSE for existing rows
+            await pool.query(`
+                UPDATE strokes SET deleted = FALSE WHERE deleted IS NULL
+            `);
+        } catch (error) {
+            console.log('deleted column migration completed or not needed');
+        }
+
+        // Create indices
         await pool.query(`
             CREATE INDEX IF NOT EXISTS idx_room_session ON strokes (room_name, session_id)
         `);
 
-        console.log('Database tables initialized');
+        await pool.query(`
+            CREATE INDEX IF NOT EXISTS idx_room_session_active ON strokes (room_name, session_id, deleted)
+        `);
+
+        console.log('Database tables initialized and migrated');
     } catch (error) {
         console.error('Error initializing database:', error);
         console.log('Falling back to file-based storage');
@@ -227,7 +266,7 @@ async function loadRoomDrawing(roomName, sessionId = null) {
     if (useDatabase && pool) {
         try {
             const result = await pool.query(
-                'SELECT x1, y1, x2, y2, color, size, tool FROM strokes WHERE room_name = $1 AND session_id = $2 ORDER BY id ASC',
+                'SELECT stroke_index, x1, y1, x2, y2, color, size, tool FROM strokes WHERE room_name = $1 AND session_id = $2 AND deleted = FALSE ORDER BY stroke_index ASC',
                 [roomName, actualSessionId]
             );
             return { strokes: result.rows };
@@ -250,14 +289,14 @@ async function loadRoomDrawing(roomName, sessionId = null) {
     }
 }
 
-async function saveStroke(roomName, stroke) {
+async function saveStroke(roomName, stroke, strokeIndex) {
     const sessionId = await getCurrentSessionId(roomName);
 
     if (useDatabase && pool) {
         try {
             await pool.query(
-                'INSERT INTO strokes (room_name, session_id, x1, y1, x2, y2, color, size, tool) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
-                [roomName, sessionId, stroke.x1, stroke.y1, stroke.x2, stroke.y2, stroke.color, stroke.size, stroke.tool]
+                'INSERT INTO strokes (room_name, session_id, stroke_index, x1, y1, x2, y2, color, size, tool) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+                [roomName, sessionId, strokeIndex, stroke.x1, stroke.y1, stroke.x2, stroke.y2, stroke.color, stroke.size, stroke.tool]
             );
         } catch (error) {
             console.error('Error saving stroke:', error);
@@ -267,10 +306,68 @@ async function saveStroke(roomName, stroke) {
         const filePath = getRoomFilePath(roomName, sessionId);
         try {
             const drawing = await loadRoomDrawing(roomName, sessionId);
-            drawing.strokes.push(stroke);
+            drawing.strokes.push({ ...stroke, stroke_index: strokeIndex });
             fs.writeFileSync(filePath, JSON.stringify(drawing, null, 2));
         } catch (error) {
             console.error('Error saving stroke:', error);
+        }
+    }
+}
+
+async function undoStroke(roomName, strokeIndex) {
+    const sessionId = await getCurrentSessionId(roomName);
+
+    if (useDatabase && pool) {
+        try {
+            await pool.query(
+                'UPDATE strokes SET deleted = TRUE WHERE room_name = $1 AND session_id = $2 AND stroke_index = $3',
+                [roomName, sessionId, strokeIndex]
+            );
+        } catch (error) {
+            console.error('Error undoing stroke:', error);
+        }
+    } else {
+        // File-based fallback - mark as deleted in JSON
+        const filePath = getRoomFilePath(roomName, sessionId);
+        try {
+            const data = fs.readFileSync(filePath, 'utf8');
+            const drawing = JSON.parse(data);
+            const stroke = drawing.strokes.find(s => s.stroke_index === strokeIndex);
+            if (stroke) {
+                stroke.deleted = true;
+            }
+            fs.writeFileSync(filePath, JSON.stringify(drawing, null, 2));
+        } catch (error) {
+            console.error('Error undoing stroke:', error);
+        }
+    }
+}
+
+async function redoStroke(roomName, strokeIndex) {
+    const sessionId = await getCurrentSessionId(roomName);
+
+    if (useDatabase && pool) {
+        try {
+            await pool.query(
+                'UPDATE strokes SET deleted = FALSE WHERE room_name = $1 AND session_id = $2 AND stroke_index = $3',
+                [roomName, sessionId, strokeIndex]
+            );
+        } catch (error) {
+            console.error('Error redoing stroke:', error);
+        }
+    } else {
+        // File-based fallback
+        const filePath = getRoomFilePath(roomName, sessionId);
+        try {
+            const data = fs.readFileSync(filePath, 'utf8');
+            const drawing = JSON.parse(data);
+            const stroke = drawing.strokes.find(s => s.stroke_index === strokeIndex);
+            if (stroke) {
+                stroke.deleted = false;
+            }
+            fs.writeFileSync(filePath, JSON.stringify(drawing, null, 2));
+        } catch (error) {
+            console.error('Error redoing stroke:', error);
         }
     }
 }
@@ -337,7 +434,7 @@ wss.on('connection', (ws) => {
                 }));
 
             } else if (data.type === 'stroke') {
-                // Save stroke to database/file
+                // Save stroke to database/file with stroke_index
                 if (currentRoom) {
                     await saveStroke(currentRoom, {
                         x1: data.x1,
@@ -347,7 +444,41 @@ wss.on('connection', (ws) => {
                         color: data.color,
                         size: data.size,
                         tool: data.tool
+                    }, data.strokeIndex);
+                }
+
+                // Broadcast to other clients
+                if (currentRoom && rooms.has(currentRoom)) {
+                    const roomClients = rooms.get(currentRoom);
+                    const messageStr = JSON.stringify(data);
+
+                    roomClients.forEach((client) => {
+                        if (client !== ws && client.readyState === WebSocket.OPEN) {
+                            client.send(messageStr);
+                        }
                     });
+                }
+            } else if (data.type === 'undo') {
+                // Undo stroke in database
+                if (currentRoom) {
+                    await undoStroke(currentRoom, data.strokeIndex);
+                }
+
+                // Broadcast to other clients
+                if (currentRoom && rooms.has(currentRoom)) {
+                    const roomClients = rooms.get(currentRoom);
+                    const messageStr = JSON.stringify(data);
+
+                    roomClients.forEach((client) => {
+                        if (client !== ws && client.readyState === WebSocket.OPEN) {
+                            client.send(messageStr);
+                        }
+                    });
+                }
+            } else if (data.type === 'redo') {
+                // Redo stroke in database
+                if (currentRoom) {
+                    await redoStroke(currentRoom, data.strokeIndex);
                 }
 
                 // Broadcast to other clients
