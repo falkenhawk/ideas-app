@@ -533,12 +533,18 @@
             raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
             const intersects = raycaster.intersectObjects(scene.children, true);
 
-            if (intersects.length === 0) {
+            // Filter out grid helper and other non-raycastable objects
+            const validIntersects = intersects.filter(hit =>
+                !hit.object.userData.isGridHelper &&
+                (hit.object.userData.isGround || hit.object.userData.blockId)
+            );
+
+            if (validIntersects.length === 0) {
                 showMessage('❌ Aim crosshair at ground or block!', 'error');
                 return;
             }
 
-            const intersect = intersects[0];
+            const intersect = validIntersects[0];
 
             if (currentMode === 'delete') {
                 // Delete mode
@@ -655,6 +661,7 @@
             gridHelper = new THREE.GridHelper(GRID_SIZE, GRID_SIZE);
             gridHelper.material.opacity = 0.3;
             gridHelper.material.transparent = true;
+            gridHelper.userData.isGridHelper = true; // Mark as non-raycastable
             scene.add(gridHelper);
 
             // Ground plane (invisible, for raycasting)
