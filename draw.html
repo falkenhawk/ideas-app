@@ -544,6 +544,9 @@
         const previewCanvas = document.getElementById('previewCanvas');
         const previewCtx = previewCanvas.getContext('2d');
 
+        // Ensure modal is hidden on page load
+        document.getElementById('historyModal').classList.add('hidden');
+
         function showStatus(msg) {
             document.getElementById('statusMessage').textContent = msg;
         }
@@ -609,12 +612,15 @@
                             <strong>Session ${data.sessions.length - index}</strong><br>
                             <small>${date.toLocaleString()}</small>
                         `;
-                        sessionItem.onclick = () => loadSessionPreview(sessionId);
+                        sessionItem.onclick = function() {
+                            loadSessionPreview(sessionId, this);
+                        };
                         sessionList.appendChild(sessionItem);
                     });
 
                     // Load first session by default
-                    loadSessionPreview(data.sessions[0]);
+                    const firstSession = sessionList.firstChild;
+                    loadSessionPreview(data.sessions[0], firstSession);
                 } else {
                     sessionList.innerHTML = '<p style="color: #666;">No previous sessions found</p>';
                 }
@@ -627,7 +633,7 @@
         }
 
         // Load and preview a specific session
-        async function loadSessionPreview(sessionId) {
+        async function loadSessionPreview(sessionId, clickedElement) {
             try {
                 const apiUrl = getApiBaseUrl();
                 const response = await fetch(`${apiUrl}/api/drawings/${encodeURIComponent(roomName)}/${encodeURIComponent(sessionId)}`);
@@ -648,7 +654,9 @@
                 document.querySelectorAll('.session-item').forEach(item => {
                     item.classList.remove('selected');
                 });
-                event.target.closest('.session-item').classList.add('selected');
+                if (clickedElement) {
+                    clickedElement.classList.add('selected');
+                }
             } catch (error) {
                 console.error('Error loading session preview:', error);
             }
@@ -907,6 +915,7 @@
             }, 'image/png');
         });
 
+        // History modal controls - attach early to ensure they work
         document.getElementById('historyBtn').addEventListener('click', () => {
             loadHistory();
         });
@@ -915,8 +924,19 @@
             document.getElementById('historyModal').classList.add('hidden');
         });
 
-        // Load existing rooms on page load
-        loadExistingRooms();
+        // Close modal when clicking outside the content
+        document.getElementById('historyModal').addEventListener('click', (e) => {
+            if (e.target.id === 'historyModal') {
+                document.getElementById('historyModal').classList.add('hidden');
+            }
+        });
+
+        // Load existing rooms on page load (with error handling)
+        try {
+            loadExistingRooms();
+        } catch (error) {
+            console.error('Error loading rooms on startup:', error);
+        }
     </script>
 </body>
 </html>
