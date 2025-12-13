@@ -33,6 +33,40 @@
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
             z-index: 100;
             max-width: 300px;
+            transition: transform 0.3s, opacity 0.3s;
+        }
+
+        #toolbar.collapsed {
+            transform: translateX(-320px);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #toolbar-toggle {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.95);
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            z-index: 99;
+            cursor: pointer;
+            font-size: 24px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+
+        #toolbar-toggle:active {
+            transform: scale(0.95);
+        }
+
+        #toolbar.collapsed ~ #toolbar-toggle {
+            display: flex;
         }
 
         #toolbar h3 {
@@ -230,6 +264,103 @@
             font-size: 14px;
             z-index: 100;
         }
+
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 30px;
+            height: 30px;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        #crosshair::before,
+        #crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(255, 255, 255, 0.8);
+            box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+        }
+
+        #crosshair::before {
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            transform: translateY(-50%);
+        }
+
+        #crosshair::after {
+            top: 0;
+            left: 50%;
+            width: 2px;
+            height: 100%;
+            transform: translateX(-50%);
+        }
+
+        #place-btn {
+            position: absolute;
+            bottom: 100px;
+            right: 20px;
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            z-index: 100;
+            cursor: pointer;
+            font-size: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+
+        #place-btn:active {
+            transform: scale(0.9);
+        }
+
+        #place-btn.delete-mode {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+
+        .toolbar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .toolbar-header h3 {
+            margin: 0;
+        }
+
+        .collapse-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 5px;
+            line-height: 1;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+        }
+
+        .collapse-btn:hover {
+            opacity: 1;
+        }
+
+        @media (max-width: 768px) {
+            #controls-hint {
+                font-size: 12px;
+                padding: 8px 15px;
+                bottom: 10px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -245,8 +376,13 @@
 
     <div id="canvas-container"></div>
 
+    <button id="toolbar-toggle" onclick="toggleToolbar()">🎨</button>
+
     <div id="toolbar">
-        <h3>🎨 Builder Tools</h3>
+        <div class="toolbar-header">
+            <h3>🎨 Builder Tools</h3>
+            <button class="collapse-btn" onclick="toggleToolbar()">✕</button>
+        </div>
 
         <div class="section">
             <div class="section-title">Mode</div>
@@ -283,13 +419,17 @@
         </div>
     </div>
 
+    <div id="crosshair"></div>
+
+    <button id="place-btn" onclick="placeBlockAtCenter()">🔨</button>
+
     <div id="status">
         <span class="status-dot"></span>
         <span id="statusText">Connecting...</span>
     </div>
 
     <div id="controls-hint">
-        🖱️ Left click: Place/Delete | Right drag: Rotate | Scroll: Zoom | Middle drag: Pan
+        📱 Tap 🔨 to place | Drag to rotate view | Pinch to zoom
     </div>
 
     <script type="importmap">
@@ -317,6 +457,85 @@
         let gridHelper, groundPlane;
         const GRID_SIZE = 50;
         const BLOCK_SIZE = 1;
+
+        // UI Helper functions
+        window.toggleToolbar = function() {
+            const toolbar = document.getElementById('toolbar');
+            toolbar.classList.toggle('collapsed');
+        };
+
+        window.placeBlockAtCenter = function() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+            // Raycast from center of screen
+            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+            const intersects = raycaster.intersectObjects(scene.children, true);
+
+            if (intersects.length > 0) {
+                const intersect = intersects[0];
+
+                if (currentMode === 'delete') {
+                    // Delete mode: remove the block at center
+                    if (intersect.object.userData.blockId) {
+                        const blockId = intersect.object.userData.blockId;
+                        send({
+                            type: 'removeBlock',
+                            blockId: blockId
+                        });
+                    }
+                } else {
+                    // Build mode: place a new block
+                    let position = new THREE.Vector3();
+
+                    if (intersect.object.userData.isGround) {
+                        // Clicking on ground
+                        position.copy(intersect.point);
+                        position.y = BLOCK_SIZE / 2;
+                    } else if (intersect.object.userData.blockId) {
+                        // Clicking on existing block
+                        position.copy(intersect.point);
+                        position.add(intersect.face.normal);
+                        position.divideScalar(BLOCK_SIZE).floor().multiplyScalar(BLOCK_SIZE);
+                        position.addScalar(BLOCK_SIZE / 2);
+                    }
+
+                    if (position) {
+                        // Snap to grid
+                        position.x = Math.round(position.x);
+                        position.y = Math.max(BLOCK_SIZE / 2, Math.round(position.y));
+                        position.z = Math.round(position.z);
+
+                        // Check bounds
+                        if (Math.abs(position.x) <= GRID_SIZE / 2 &&
+                            Math.abs(position.z) <= GRID_SIZE / 2 &&
+                            position.y > 0) {
+
+                            const blockId = `${Date.now()}_${Math.random()}`;
+                            send({
+                                type: 'addBlock',
+                                blockId: blockId,
+                                x: position.x,
+                                y: position.y,
+                                z: position.z,
+                                shape: currentShape,
+                                color: currentColor
+                            });
+                        }
+                    }
+                }
+            }
+        };
+
+        function updatePlaceButton() {
+            const placeBtn = document.getElementById('place-btn');
+            if (currentMode === 'delete') {
+                placeBtn.classList.add('delete-mode');
+                placeBtn.textContent = '🗑️';
+            } else {
+                placeBtn.classList.remove('delete-mode');
+                placeBtn.textContent = '🔨';
+            }
+        }
 
         // Initialize Three.js scene
         function initScene() {
@@ -579,6 +798,7 @@
                 document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 currentMode = btn.dataset.mode;
+                updatePlaceButton();
             });
         });
 
@@ -602,6 +822,7 @@
 
         // Initialize scene on load
         initScene();
+        updatePlaceButton();
     </script>
 </body>
 </html>
